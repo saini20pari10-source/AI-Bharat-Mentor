@@ -1,0 +1,20 @@
+
+.env
+.env.*
+!.env.example
+venv/
+.venv/
+__pycache__/
+*.pyc
+node_modules/
+ReactFrontend/node_modules/
+ReactFrontend/dist/
+instance/
+*.log
+
+# Private database and uploaded files
+db.json
+uploads/
+
+# Local model files (not needed for GitHub Pages)
+*.pkl
