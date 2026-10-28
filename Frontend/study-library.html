@@ -1,0 +1,365 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Study Library | AI Bharat Mentor</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: linear-gradient(135deg,#080d20,#211342);
+  color: white;
+  min-height: 100vh;
+}
+main { max-width: 1100px; margin: auto; padding: 30px 18px; }
+h1 { color: #49ddff; }
+h2 { color: #bba2ff; }
+p { color: #c8d3e8; }
+.panel, .card {
+  background: #121b36;
+  border: 1px solid #344368;
+  border-radius: 16px;
+  padding: 20px;
+  margin: 16px 0;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit,minmax(220px,1fr));
+  gap: 14px;
+}
+input, select, textarea {
+  width: 100%;
+  padding: 12px;
+  margin: 7px 0 15px;
+  border-radius: 8px;
+  border: 1px solid #53618a;
+  background: #09132a;
+  color: white;
+}
+button, .btn {
+  display: inline-block;
+  background: #7056e8;
+  color: white;
+  padding: 11px 16px;
+  border: none;
+  border-radius: 9px;
+  cursor: pointer;
+  text-decoration: none;
+  margin: 5px 5px 5px 0;
+}
+button:hover, .btn:hover { background: #16a9d2; }
+button:disabled { opacity: .5; }
+.danger { background: #a73555; }
+.hidden { display: none; }
+.card h3 { color: #49ddff; }
+#status, #adminStatus, #uploadStatus {
+  padding: 10px;
+  color: #ffda88;
+}
+</style>
+</head>
+<body>
+<main>
+  <h1>📚 AI Bharat Mentor Study Library</h1>
+  <p>Videos, PDF notes and free learning resources.</p>
+
+  <section class="panel">
+    <h2>Search Learning Materials</h2>
+    <div class="grid">
+      <input id="search" placeholder="Search courses...">
+      <select id="skillFilter">
+        <option value="">All Skills</option>
+      </select>
+      <select id="kindFilter">
+        <option value="">All Materials</option>
+        <option value="video">Videos</option>
+        <option value="document">PDF / Notes</option>
+        <option value="image">Images</option>
+        <option value="link">Links</option>
+      </select>
+    </div>
+    <button onclick="loadLibrary()">Refresh Library</button>
+  </section>
+
+  <h2>Available Resources</h2>
+  <p id="status">Loading...</p>
+  <div id="resources" class="grid"></div>
+
+  <section class="panel">
+    <h2>🔐 Founder Admin Dashboard</h2>
+    <p>Only the Founder can upload or delete materials.</p>
+
+    <input id="adminKey" type="password"
+           placeholder="Enter private Admin Key"
+           autocomplete="off">
+    <button onclick="verifyAdmin()">Verify Admin</button>
+    <button onclick="lockAdmin()">Lock Admin</button>
+    <p id="adminStatus"></p>
+
+    <form id="uploadForm" class="hidden">
+      <h2>Add New Learning Material</h2>
+
+      <label>Title</label>
+      <input name="title" required minlength="2">
+
+      <label>Skill / Subject</label>
+      <input name="skill" placeholder="Python, Java, AI">
+
+      <label>Material Type</label>
+      <select id="kind" name="kind" onchange="updateFields()">
+        <option value="video">Video</option>
+        <option value="document">PDF / Notes</option>
+        <option value="image">Image</option>
+        <option value="link">Website Link</option>
+      </select>
+
+      <label>Description</label>
+      <textarea name="description"></textarea>
+
+      <div id="urlBox">
+        <label>YouTube / Website URL</label>
+        <input id="url" name="url" type="url"
+               placeholder="https://...">
+      </div>
+
+      <div id="fileBox">
+        <label>Upload File</label>
+        <input id="file" name="file" type="file">
+      </div>
+
+      <label>Learning Hours</label>
+      <input name="hours" type="number"
+             value="1" min="0.1" max="500" step="0.1">
+
+      <button id="publishBtn" type="submit">
+        Publish Resource
+      </button>
+      <p id="uploadStatus"></p>
+    </form>
+  </section>
+</main>
+
+<script>
+let materials = [];
+let verified = false;
+
+const el = id => document.getElementById(id);
+
+async function api(path, options = {}) {
+  const response = await fetch(path, options);
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || "Request failed");
+  }
+  return data;
+}
+
+async function loadLibrary() {
+  el("status").textContent = "Loading...";
+  try {
+    materials = await api("/api/library");
+    const skills = [...new Set(
+      materials.map(x => x.skill).filter(Boolean)
+    )].sort();
+
+    const selected = el("skillFilter").value;
+    el("skillFilter").replaceChildren(
+      new Option("All Skills", ""),
+      ...skills.map(s => new Option(s, s))
+    );
+    el("skillFilter").value =
+      skills.includes(selected) ? selected : "";
+
+    el("status").textContent = "";
+    showMaterials();
+  } catch (error) {
+    el("status").textContent = error.message;
+  }
+}
+
+function showMaterials() {
+  const search = el("search").value.toLowerCase();
+  const skill = el("skillFilter").value;
+  const kind = el("kindFilter").value;
+  const container = el("resources");
+  container.replaceChildren();
+
+  const filtered = materials.filter(item =>
+    (!skill || item.skill === skill) &&
+    (!kind || item.kind === kind) &&
+    (item.title + " " + item.description + " " +
+     item.skill).toLowerCase().includes(search)
+  );
+
+  if (!filtered.length) {
+    container.textContent = "No resources found.";
+    return;
+  }
+
+  filtered.forEach(item => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const title = document.createElement("h3");
+    title.textContent = item.title;
+
+    const details = document.createElement("p");
+    details.textContent =
+      item.kind + " | " + (item.skill || "General");
+
+    const description = document.createElement("p");
+    description.textContent = item.description || "";
+
+    card.append(title, details, description);
+
+    const url = item.fileUrl ||
+   item.file_url ||
+   (item.kind === "document" && item.id
+    ? `/api/library/${encodeURIComponent(item.id)}/file`
+    : item.url);
+    if (url) {
+      const link = document.createElement("a");
+      link.className = "btn";
+      link.href = url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent =
+        item.kind === "video" ? "Watch Video" :
+        item.kind === "link" ? "Open Link" :
+        "View / Download";
+      card.append(link);
+    }
+
+    if (verified) {
+      const remove = document.createElement("button");
+      remove.className = "danger";
+      remove.textContent = "Delete";
+      remove.onclick = () => deleteMaterial(item);
+      card.append(remove);
+    }
+
+    container.append(card);
+  });
+}
+
+async function verifyAdmin() {
+  try {
+    await api("/api/library/admin-check", {
+      headers: {
+        "X-Admin-Key": el("adminKey").value
+      }
+    });
+    verified = true;
+    el("adminStatus").textContent = "Admin verified!";
+    el("uploadForm").classList.remove("hidden");
+    showMaterials();
+  } catch (error) {
+    lockAdmin();
+    el("adminStatus").textContent = error.message;
+  }
+}
+
+function lockAdmin() {
+  verified = false;
+  el("adminKey").value = "";
+  el("uploadForm").classList.add("hidden");
+  el("adminStatus").textContent = "Admin locked";
+  showMaterials();
+}
+
+function updateFields() {
+  const kind = el("kind").value;
+  const needsFile = kind === "document" || kind === "image";
+
+  el("urlBox").classList.toggle("hidden", needsFile);
+  el("fileBox").classList.toggle(
+    "hidden", kind === "link"
+  );
+
+  el("file").required = needsFile;
+  el("url").required = kind === "link";
+
+  el("file").accept =
+    kind === "document" ?
+      ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md" :
+    kind === "image" ?
+      ".png,.jpg,.jpeg,.webp" :
+    kind === "video" ? ".mp4,.webm" : "";
+}
+
+el("uploadForm").onsubmit = async event => {
+  event.preventDefault();
+  if (!verified) return;
+
+  const form = event.currentTarget;
+  const data = new FormData(form);
+
+  if (!el("file").files.length) {
+    data.delete("file");
+  }
+
+  if (el("kind").value === "video" &&
+      !el("url").value && !el("file").files.length) {
+    el("uploadStatus").textContent =
+      "Add a video URL or select a video file.";
+    return;
+  }
+
+  const button = el("publishBtn");
+  button.disabled = true;
+  el("uploadStatus").textContent = "Uploading...";
+
+  try {
+    await api("/api/library", {
+      method: "POST",
+      headers: {
+        "X-Admin-Key": el("adminKey").value
+      },
+      body: data
+    });
+
+    el("uploadStatus").textContent =
+      "Resource published successfully!";
+    form.reset();
+    updateFields();
+    await loadLibrary();
+  } catch (error) {
+    el("uploadStatus").textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+};
+
+async function deleteMaterial(item) {
+  if (!verified || !confirm("Delete " + item.title + "?")) {
+    return;
+  }
+  try {
+    await api("/api/library/" +
+      encodeURIComponent(item.id), {
+      method: "DELETE",
+      headers: {
+        "X-Admin-Key": el("adminKey").value
+      }
+    });
+    await loadLibrary();
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+["search", "skillFilter", "kindFilter"].forEach(id => {
+  el(id).addEventListener(
+    id === "search" ? "input" : "change",
+    showMaterials
+  );
+});
+
+updateFields();
+loadLibrary();
+</script>
+</body>
+</html>

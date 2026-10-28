@@ -1,0 +1,151 @@
+/* lp-library.js: Study Library. Founder videos aur support material (PDF, notes, images, links) jodta hai,
+   sab students Learning Resources me dekhte hain, dekh sakte hain aur "Add to my list" se apni list me le sakte hain.
+   index.html me lp-addon.js aur lp-extra.js ke BAAD load hota hai. */
+(function () {
+  if (window.__lpLib) return;
+  window.__lpLib = true;
+  const API = (window.API_BASE || '').replace(/\/$/, '');
+  const norm = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const $i = id => document.getElementById(id);
+  const LB = { items: null, ts: 0, kind: 'All', skill: 'All', q: '', admin: sessionStorage.getItem('adminKey') || '', open: false, err: '' };
+  const inp = 'style="width:100%;background:#16264a;border:1px solid #7C4DFF55;border-radius:10px;padding:11px;color:#fff;font:13px Inter;outline:0"';
+  const ICON = { video: '🎬', document: '📄', image: '🖼️', link: '🔗' };
+  const LABEL = { All: 'All', video: 'Videos', document: 'Documents', image: 'Images', link: 'Links' };
+  const fmt = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+  const ytId = u => { const m = String(u || '').match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/))([\w-]{11})/); return m ? m[1] : null; };
+  const vimeoId = u => { const m = String(u || '').match(/vimeo\.com\/(?:video\/)?(\d+)/); return m ? m[1] : null; };
+
+  async function call(path, opt) {
+    const r = await fetch(API + path, opt);
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || 'Request failed');
+    return d;
+  }
+  async function load() {
+    try { LB.items = await call('/api/library'); LB.ts = Date.now(); LB.err = ''; }
+    catch (e) { LB.err = e.message; if (!LB.items) LB.items = []; }
+    paint();
+  }
+
+  /* ----- screen ----- */
+  const skeleton = () => '<div id="lib-box"><div class="sp"><h3>📚 Study Library: videos aur support material</h3><button class="btn out" style="padding:6px 12px" data-lib="admin">🔒 Founder panel</button></div>'
+    + '<p class="mu">Founder ke jode hue videos, notes aur PDF. "Add to my list" se apni list me lo, poora karne par skill level badhega.</p>'
+    + '<div id="lib-admin"></div>'
+    + '<div class="g2" style="grid-template-columns:2fr 1fr;margin-top:10px"><input id="lib-q" placeholder="Search library..." value="' + esc(LB.q) + '" ' + inp + '><select id="lib-skill" data-lib="skill" style="width:100%"></select></div>'
+    + '<div id="lib-tabs" style="margin:10px 0"></div><div id="lib-list" style="display:grid;gap:12px"></div></div>';
+
+  const _res = P.resources;
+  P.resources = () => {
+    let h = _res();
+    const i = h.indexOf('<h3>Suggested for you</h3>');
+    if (i >= 0) return h.slice(0, i) + skeleton() + h.slice(i);
+    return h.replace('</main>', skeleton() + '</main>');
+  };
+
+  const gapOf = () => Object.fromEntries(((window.__lpAPI && window.__lpAPI.gaps()) || []).map(g => [norm(g.n), g.gap]));
+  function visible() {
+    const gm = gapOf(), q = norm(LB.q);
+    return (LB.items || []).filter(it => (LB.kind === 'All' || it.kind === LB.kind) && (LB.skill === 'All' || norm(it.skill) === norm(LB.skill))
+      && norm(it.title + ' ' + it.skill + ' ' + it.description).includes(q))
+      .sort((a, b) => ((gm[norm(b.skill)] || 0) - (gm[norm(a.skill)] || 0)) || (b.createdAt - a.createdAt));
+  }
+  function card(it) {
+    const have = window.__lpAPI && window.__lpAPI.has(it.title);
+    const meta = [it.kind, it.skill, it.hours + 'h', it.fileName ? fmt(it.size) : ''].filter(Boolean).map(esc).join(' · ');
+    let main;
+    if (it.kind === 'video') main = '<button class="btn" style="padding:7px 12px" data-lib="watch" data-id="' + it.id + '">▶ Watch</button>';
+    else main = '<a class="btn" style="padding:7px 12px" href="' + esc(it.fileUrl ? API + it.fileUrl : it.url) + '" target="_blank" rel="noopener noreferrer">' + (it.fileUrl ? 'Open / Download' : 'Open ↗') + '</a>';
+    const add = have ? '<span class="chip">✔ In my list</span>' : (window.__lpAPI ? '<button class="btn out" style="padding:7px 12px" data-lib="add" data-id="' + it.id + '">+ Add to my list</button>' : '');
+    const del = LB.adminOK ? '<button class="star" data-lib="del" data-id="' + it.id + '" title="Delete (founder)">🗑</button>' : '';
+    return '<div class="cd sp"><div>' + (ICON[it.kind] || '📘') + ' <b>' + esc(it.title) + '</b><br><span class="mu">' + meta + '</span>'
+      + (it.description ? '<br><span class="mu">' + esc(it.description) + '</span>' : '') + '</div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">' + main + add + del + '</div></div>';
+  }
+  function paintList() {
+    const l = $i('lib-list'); if (!l) return;
+    if (LB.items === null) { l.innerHTML = '<p class="mu">Library load ho rahi hai…</p>'; return; }
+    const v = visible();
+    l.innerHTML = LB.err ? '<p class="mu">⚠️ ' + esc(LB.err) + '</p>'
+      : v.length ? v.map(card).join('') : '<p class="mu">' + (LB.items.length ? 'Is filter me kuch nahi mila.' : 'Abhi library khali hai. Founder panel se pehla video ya material jodo.') + '</p>';
+  }
+  function paint() {
+    const sel = $i('lib-skill'), tabs = $i('lib-tabs'); if (!sel || !tabs) return;
+    const skills = ['All', ...new Set((LB.items || []).map(i => i.skill).filter(Boolean))];
+    if (!skills.includes(LB.skill)) LB.skill = 'All';
+    sel.innerHTML = skills.map(s => '<option ' + (s === LB.skill ? 'selected' : '') + '>' + esc(s) + '</option>').join('');
+    tabs.innerHTML = '<div class="tabs2">' + Object.keys(LABEL).map(k => '<span data-lib="kind" data-v="' + k + '" class="' + (LB.kind === k ? 'on' : '') + '">' + LABEL[k] + '</span>').join('') + '</div>';
+    paintList(); paintAdmin();
+  }
+  function paintAdmin() {
+    const a = $i('lib-admin'); if (!a) return;
+    if (!LB.open) { a.innerHTML = ''; return; }
+    if (!LB.adminOK) {
+      a.innerHTML = '<div class="cd" style="margin-top:10px"><b>Founder panel</b><p class="mu" style="margin:6px 0 10px">Admin key daalo (.env ka ADMIN_KEY).</p><div class="sp"><input id="lib-key" type="password" placeholder="Admin key" ' + inp + '><button class="btn" data-lib="unlock">Unlock</button></div></div>';
+      return;
+    }
+    a.innerHTML = '<div class="cd" style="margin-top:10px"><div class="sp"><b>Naya video / material jodo</b><button class="btn out" style="padding:5px 10px" data-lib="lock">Lock</button></div>'
+      + '<div class="g2" style="margin-top:10px"><input id="lib-title" placeholder="Title (e.g. Python Basics Notes)" ' + inp + '>'
+      + '<select id="lib-kind" style="width:100%"><option value="video">Video (link ya mp4/webm file)</option><option value="document">Document (pdf, docx, pptx, xlsx, txt, md)</option><option value="image">Image (png, jpg, webp)</option><option value="link">Link</option></select>'
+      + '<input id="lib-url" placeholder="Link: YouTube / Vimeo / website (file na ho to)" ' + inp + '><input id="lib-file" type="file" style="color:#A7B0D6;font:13px Inter">'
+      + '<input id="lib-skill-in" list="lp-dl" placeholder="Skill (e.g. Python)" ' + inp + '><input id="lib-hours" type="number" min="0.1" max="500" step="0.5" value="1" title="Ghante" ' + inp + '></div>'
+      + '<input id="lib-desc" placeholder="Chhota description (optional)" style="margin-top:10px;width:100%;background:#16264a;border:1px solid #7C4DFF55;border-radius:10px;padding:11px;color:#fff;font:13px Inter;outline:0"><br><br>'
+      + '<button class="btn" data-lib="upload">⬆ Upload</button><p class="mu" style="margin-top:8px">Bade video ke liye YouTube (unlisted) link behtar hai. Apna hi content ya jiski ijazat ho wahi jodo.</p></div>';
+  }
+
+  /* ----- actions ----- */
+  function player(it) {
+    let body, y = ytId(it.url), v = vimeoId(it.url);
+    if (y) body = '<iframe src="https://www.youtube-nocookie.com/embed/' + y + '" allowfullscreen allow="encrypted-media; picture-in-picture" style="width:100%;aspect-ratio:16/9;border:0;border-radius:10px"></iframe>';
+    else if (v) body = '<iframe src="https://player.vimeo.com/video/' + v + '" allowfullscreen style="width:100%;aspect-ratio:16/9;border:0;border-radius:10px"></iframe>';
+    else if (it.fileUrl || /\.(mp4|webm)(\?|$)/i.test(it.url || '')) body = '<video controls autoplay playsinline style="width:100%;border-radius:10px;background:#000" src="' + esc(it.fileUrl ? API + it.fileUrl : it.url) + '"></video>';
+    else { window.open(it.url, '_blank', 'noopener'); return; }
+    modal('<div class="sp"><b>' + esc(it.title) + '</b><button class="btn out" style="padding:5px 10px" data-act="mclose">✕ Close</button></div>' + body);
+    const mb = document.querySelector('#md .mb'); if (mb) mb.style.maxWidth = '920px';
+  }
+  document.addEventListener('click', async e => {
+    const el = e.target.closest('[data-lib]'); if (!el) return;
+    const a = el.dataset.lib, id = el.dataset.id, it = (LB.items || []).find(x => x.id === id);
+    if (a === 'admin') { LB.open = !LB.open; return paintAdmin(); }
+    if (a === 'kind') { LB.kind = el.dataset.v; return paint(); }
+    if (a === 'watch' && it) return player(it);
+    if (a === 'add' && it && window.__lpAPI) {
+      window.__lpAPI.add({ title: it.title, url: it.fileUrl ? it.fileUrl : (it.url || ''), type: it.kind === 'video' ? 'Video' : 'Article', skill: it.skill, hours: it.hours });
+      return toast('Aapki list me jod diya');
+    }
+    if (a === 'lock') { LB.admin = ''; LB.adminOK = false; sessionStorage.removeItem('adminKey'); paintAdmin(); return paintList(); }
+    if (a === 'unlock') {
+      const key = $i('lib-key').value;
+      try { await call('/api/library/admin-check', { headers: { 'X-Admin-Key': key } }); LB.admin = key; LB.adminOK = true; sessionStorage.setItem('adminKey', key); toast('Founder panel khul gaya'); paintAdmin(); paintList(); }
+      catch (err) { toast(err.message); }
+      return;
+    }
+    if (a === 'del' && it) {
+      if (!confirm('"' + it.title + '" delete karna hai?')) return;
+      try { await call('/api/library/' + id, { method: 'DELETE', headers: { 'X-Admin-Key': LB.admin } }); toast('Delete ho gaya'); load(); } catch (err) { toast(err.message); }
+      return;
+    }
+    if (a === 'upload') {
+      const fd = new FormData();
+      fd.append('title', $i('lib-title').value); fd.append('kind', $i('lib-kind').value); fd.append('url', $i('lib-url').value);
+      fd.append('skill', $i('lib-skill-in').value); fd.append('hours', $i('lib-hours').value); fd.append('description', $i('lib-desc').value);
+      const f = $i('lib-file').files[0]; if (f) fd.append('file', f);
+      el.disabled = true; el.textContent = 'Uploading… (badi file me time lagta hai)';
+      try { const d = await call('/api/library', { method: 'POST', headers: { 'X-Admin-Key': LB.admin }, body: fd }); toast('Jod diya: ' + d.title); LB.open = true; await load(); }
+      catch (err) { toast(err.message); el.disabled = false; el.textContent = '⬆ Upload'; }
+    }
+  });
+  document.addEventListener('change', e => { if (e.target.dataset && e.target.dataset.lib === 'skill') { LB.skill = e.target.value; paintList(); } });
+  document.addEventListener('input', e => { if (e.target.id === 'lib-q') { LB.q = e.target.value; paintList(); } });
+
+  /* ----- har render ke baad library bharo ----- */
+  const _render = render;
+  render = function (keep) {
+    _render(keep);
+    if (location.hash === '#resources') {
+      LB.adminOK = LB.adminOK || false;
+      paint();
+      if (LB.items === null || Date.now() - LB.ts > 30000) load();
+    }
+  };
+  if (LB.admin) call('/api/library/admin-check', { headers: { 'X-Admin-Key': LB.admin } }).then(() => { LB.adminOK = true; paint(); }).catch(() => { LB.admin = ''; sessionStorage.removeItem('adminKey'); });
+  render(true);
+})();

@@ -1,0 +1,63 @@
+/* lp-extra.js: AI chat ko server se jodta hai + neeche dahine kone me status box (Server / Login / AI).
+   index.html me lp-addon.js ke BAAD load hota hai. */
+(function () {
+  if (window.__lpExtra) return;
+  window.__lpExtra = true;
+  const API = (window.API_BASE || '').replace(/\/$/, '');
+  const tok = () => localStorage.getItem('tok');
+
+  async function api(p, o) {
+    o = o || {};
+    const r = await fetch(API + '/api' + p, {
+      method: o.method || 'GET',
+      headers: Object.assign({ 'Content-Type': 'application/json' }, tok() ? { Authorization: 'Bearer ' + tok() } : {}),
+      body: o.body ? JSON.stringify(o.body) : undefined
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || 'Request failed');
+    return d;
+  }
+
+  /* AI chat: hamesha server (Ollama) ko bulao. Jawab me demo kabhi nahi. */
+  if (!/\/api\//.test(String(chatGo))) {
+    chatGo = async function () {
+      const i = document.querySelector('#cin'), m = document.querySelector('#msgs');
+      if (!i || !i.value.trim()) return;
+      const q = i.value.trim(); i.value = '';
+      m.insertAdjacentHTML('beforeend', '<div class="msg u">' + esc(q) + '</div><div class="msg" id="ty">Fugu is typing…</div>');
+      let r, demo = false;
+      try {
+        r = (await api('/chat', { method: 'POST', body: {
+          message: q, lang: L,
+          profile: { name: U.name, edu: U.edu, goal: U.goal, skills: U.skills },
+          history: CH.slice(-6).map(c => ({ role: c.r === 'u' ? 'user' : 'assistant', content: c.t }))
+        } })).reply;
+      } catch (e) {
+        demo = true;
+        if (e instanceof TypeError) r = '⚠️ Server se connect nahi ho paya. Terminal me python server.py chal raha hai?';
+        else if (/log in/i.test(e.message)) { localStorage.removeItem('tok'); r = '⚠️ Chat ke liye pehle Login ya Sign up karo.'; }
+        else r = '⚠️ ' + e.message;
+      }
+      const ty = document.querySelector('#ty'); if (ty) { ty.removeAttribute('id'); ty.style.whiteSpace = 'pre-wrap'; ty.textContent = r; }
+      if (!demo) { CH.push({ r: 'u', t: q }, { r: 'b', t: r }); CH = CH.slice(-30); SV('ch', CH); }
+    };
+  }
+
+  /* Status box */
+  if (!document.getElementById('sbadge')) {
+    const b = document.createElement('div');
+    b.id = 'sbadge';
+    b.style.cssText = 'position:fixed;right:10px;bottom:10px;z-index:70;background:#000c;color:#fff;border:1px solid #7C4DFF;border-radius:8px;padding:7px 11px;font:12px Inter,sans-serif;max-width:75vw';
+    b.textContent = 'Checking…';
+    document.body.appendChild(b);
+    const check = async () => {
+      let h;
+      try { h = await api('/health'); }
+      catch (e) { b.textContent = '❌ Server se connect nahi ho paya. Terminal me python server.py chalao'; return; }
+      let li = !!tok();
+      if (li) { try { await api('/me'); } catch (e) { localStorage.removeItem('tok'); li = false; } }
+      b.textContent = '✅ Server OK  ·  ' + (li ? '✅ Login OK' : '⚠️ Login nahi hua (chat chalega, data save nahi hoga)') + '  ·  ' + (h.ollama === false ? '❌ Ollama band' : '✅ AI (Ollama) chalu');
+    };
+    check(); setInterval(check, 15000);
+  }
+})();
