@@ -1,26 +1,80 @@
-
+# Python environment and cache
 .env
 .env.*
 !.env.example
 venv/
 .venv/
 __pycache__/
-*.pyc
-node_modules/
-ReactFrontend/node_modules/
-ReactFrontend/dist/
-instance/
-*.log
+*.py[cod]
+*.pkl
 
 # Private database and uploaded files
 db.json
 uploads/
+instance/
+*.log
 
-# Local model files (not needed for GitHub Pages)
-*.pkl
+# Node.js dependencies and logs
+node_modules/
+ReactFrontend/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-store/
+.pnp.*
 
-ReactFrontend/App.backup.txt
-ReactFrontend/src/App.backup.txt
+# Frontend build output
+ReactFrontend/dist/
+dist/
+build/Release/
+.next/
+.nuxt/
+.output/
+.svelte-kit/
+.vuepress/dist/
+.vite/
+.vitepress/dist/
+.vitepress/cache/
+.astro/
+.turbo/
+.docusaurus/
+.serverless/
+.fusebox/
 
+# JavaScript tooling caches
+.cache/
+.parcel-cache/
+.nyc_output/
+coverage/
+*.lcov
+*.tsbuildinfo
+.eslintcache
+.stylelintcache
+.npm/
+
+# Runtime and diagnostic files
+logs/
+pids/
+*.pid
+*.pid.lock
+*.seed
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Other generated files
+bower_components/
+jspm_packages/
+web_modules/
+lib-cov/
+.grunt/
+.dynamodb/
+.firebase/
+.tern-port
+.vscode-test/
+.vite/
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# Project backup files
 ReactFrontend/App.backup.txt
 ReactFrontend/src/App.backup.txt
