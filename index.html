@@ -187,7 +187,7 @@ const shell=(on,b)=>`<div class="ap"><aside>${brand}<div class="nv">${NAVS.map((
           border:1px solid #7C4DFF;
           border-radius:10px;margin-top:15px;">
   📚 Study Library
-</a>
+</a></div></aside>
 <main><div class="tb"><input class="sr" placeholder="Search anything..."><select class="lg">${opts()}</select><div class="us"><i class="ua">${esc((U.name||'P')[0].toUpperCase())}</i>${esc(U.full||U.name)}</div></div>${b}</main></div>`;
 const chat=big=>`<div class="cd" style="min-height:${big?400:300}px"><div id="msgs"><div class="msg">Hi, ${esc(U.name)}! 👋 I'm Fugu, your AI mentor. I can help with career guidance, study plans, interview prep and much more. What would you like to know today?</div></div>
 <div class="sg"><span>Best skills for software developer?</span><span>How to prepare for interviews?</span><span>Make a 6 month study plan</span><span>Job opportunities in tech</span></div>
