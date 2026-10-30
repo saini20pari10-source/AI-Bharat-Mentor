@@ -181,12 +181,13 @@ const tabs=(sc,list,cur)=>`<div class="tabs2">${list.map(x=>`<span data-tab="${s
 
 const NAVS=[['🏠','dashboard'],['🧭','roadmap'],['📚','resources'],['🤖','chat'],['📊','skills'],['📈','progress'],['📄','resume'],['🎤','mock'],['👤','profile'],['⚙️','profile']];
 
-const shell=(on,b)=>`<div class="ap"><aside>${brand}<div class="nv">${NAVS.map((n,i)=>`<a href="#${n[1]}" class="${n[1]===on&&i!==9?'on':''}"><span>${n[0]}</span>${nl(i)}</a>`).join('')}<a href="/study-library.html"
+const shell=(on,b)=>`<div class="ap"><aside>${brand}<div class="nv">${NAVS.map((n,i)=>`<a href="#${n[1]}" class="${n[1]===on&&i!==9?'on':''}"><span>${n[0]}</span>${nl(i)}</a>`).join('')}<a href="https://saini20pari10-source.github.io/AI-Bharat-Mentor/study-library.html"
+   target="_blank"
    style="display:block;padding:12px;color:#22d3ee;
           border:1px solid #7C4DFF;
           border-radius:10px;margin-top:15px;">
   📚 Study Library
-</a></div></aside>
+</a>
 <main><div class="tb"><input class="sr" placeholder="Search anything..."><select class="lg">${opts()}</select><div class="us"><i class="ua">${esc((U.name||'P')[0].toUpperCase())}</i>${esc(U.full||U.name)}</div></div>${b}</main></div>`;
 const chat=big=>`<div class="cd" style="min-height:${big?400:300}px"><div id="msgs"><div class="msg">Hi, ${esc(U.name)}! 👋 I'm Fugu, your AI mentor. I can help with career guidance, study plans, interview prep and much more. What would you like to know today?</div></div>
 <div class="sg"><span>Best skills for software developer?</span><span>How to prepare for interviews?</span><span>Make a 6 month study plan</span><span>Job opportunities in tech</span></div>
