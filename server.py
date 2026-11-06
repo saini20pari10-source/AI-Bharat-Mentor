@@ -525,23 +525,24 @@ def on_error(e):
 
 
 @app.after_request
-
 def cors(resp):
-
     if request.path == "/" or request.path.endswith(".html"):
-
         resp.headers["Cache-Control"] = "no-store"
 
-    if CORS_ORIGIN:
+    origin = request.headers.get("Origin", "")
+    allowed_origins = [
+        item.strip().rstrip("/")
+        for item in CORS_ORIGIN.split(",")
+        if item.strip()
+    ]
 
-        resp.headers["Access-Control-Allow-Origin"] = CORS_ORIGIN
-
+    if origin and origin.rstrip("/") in allowed_origins:
+        resp.headers["Access-Control-Allow-Origin"] = origin
+        resp.headers["Vary"] = "Origin"
         resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-
         resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
 
     return resp
-
 
 
 
