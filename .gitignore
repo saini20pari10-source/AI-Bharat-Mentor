@@ -149,3 +149,7 @@ vite.config.ts.timestamp-*
 .turbo
 
 db.json
+
+# Python cache
+__pycache__/
+*.py[cod]
