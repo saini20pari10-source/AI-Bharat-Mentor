@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 // AI Bharat Mentor (ABM) — React frontend for existing Flask server.py
 // Start Flask on :5000 and Vite on :5173. No API keys are hard-coded here.
@@ -149,7 +149,7 @@ export default function App() {
   const [adminKey, setAdminKey] = useState('');
   const [adminOK, setAdminOK] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
-  const [videoPreview, setVideoPreview] = useState(false);
+  const [, setVideoPreview] = useState(false);
   const [mockKind, setMockKind] = useState('Technical');
   const [mockIndex, setMockIndex] = useState(0);
   const [mockAnswer, setMockAnswer] = useState('');
@@ -582,7 +582,6 @@ export default function App() {
     (type === 'all' || item.kind === type) &&
     [item.title, item.skill, item.description].join(' ').toLowerCase().includes(search.trim().toLowerCase())
   );
-  const mainPages = ['dashboard', 'roadmap', 'library', 'chat', 'skills', 'progress', 'resume', 'mock', 'profile', 'founder'];
 
   function content() {
     switch (page) {
