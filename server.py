@@ -45,7 +45,7 @@ from dotenv import load_dotenv
 from flask import Flask, g, jsonify, request, send_from_directory
 
 from werkzeug.exceptions import HTTPException
-
+from flask_cors import CORS
 
 
 try:
@@ -70,7 +70,7 @@ SECRET = os.getenv("JWT_SECRET") or "dev-secret-change-me"
 
 GUEST_CHAT = os.getenv("GUEST_CHAT", "1") == "1"   # 1 = bina login ke bhi chat chalega. Live karte waqt 0 karo
 
-CORS_ORIGIN = os.getenv("CORS_ORIGIN", "")     # frontend alag port/site par ho tabhi bharo
+CORS_ORIGIN = os.getenv("CORS_ORIGIN", "")   # frontend alag port/site par ho tabhi bharo
 
 if not os.getenv("JWT_SECRET"):
 
@@ -83,6 +83,22 @@ if PROD and len(SECRET) < 24:
 
 
 app = Flask(__name__, static_folder=None)
+# Career ML API registration
+from career_api import career_bp
+
+app.register_blueprint(career_bp)
+allowed_origins = [
+    origin.strip()
+    for origin in CORS_ORIGIN.split(",")
+    if origin.strip()
+]
+
+CORS(
+    app,
+    resources={r"/api/*": {"origins": allowed_origins}},
+    allow_headers=["Content-Type", "Authorization"],
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+)
 
 
 
@@ -116,23 +132,37 @@ class ApiError(Exception):
 
 
 
-
-
 # ---------- MySQL database ----------
 
 _lock = threading.RLock()
 
-MYSQL_DB = os.getenv("MYSQL_DB", "ai_bharat")
+MYSQL_DB = os.getenv("MYSQL_DB", "ai_bharat_mentor")
 
 if not re.fullmatch(r"[A-Za-z0-9_]+", MYSQL_DB):
-
     raise SystemExit("MYSQL_DB me sirf akshar, number aur _ hona chahiye")
 
-MYSQL = dict(host=os.getenv("MYSQL_HOST", "127.0.0.1"), port=int(os.getenv("MYSQL_PORT", "3306")),
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CA_PATH = os.path.join(BASE_DIR, "certs", "ca.pem")
 
-             user=os.getenv("MYSQL_USER", "root"), password=os.getenv("MYSQL_PASSWORD", ""),
+MYSQL = dict(
+    host=os.getenv("MYSQL_HOST", "127.0.0.1"),
+    port=int(os.getenv("MYSQL_PORT", "3306")),
+    user=os.getenv("MYSQL_USER", "root"),
+    password=os.getenv("MYSQL_PASSWORD", ""),
+    charset="utf8mb4",
+    cursorclass=pymysql.cursors.DictCursor,
+    connect_timeout=10
+)
 
-             charset="utf8mb4", cursorclass=pymysql.cursors.DictCursor, connect_timeout=5)
+if os.getenv("MYSQL_SSL", "false").lower() == "true":
+    if not os.path.isfile(CA_PATH):
+        raise SystemExit(f"CA certificate nahi mila: {CA_PATH}")
+
+    MYSQL["ssl"] = {"ca": CA_PATH}
+
+
+
+
 
 
 
@@ -162,56 +192,31 @@ def dbc():
 
         conn.close()
 
-
-
-
-
 def init_db():
-
-    """Database aur users table khud bana deta hai (pehli baar)."""
-
+    """Existing TiDB database mein users table ensure karta hai."""
     try:
-
-        c = pymysql.connect(**MYSQL)
-
-        with c.cursor() as cur:
-
-            cur.execute(f"CREATE DATABASE IF NOT EXISTS `{MYSQL_DB}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
-
-        c.commit()
-
-        c.close()
-
         with dbc() as conn, conn.cursor() as cur:
-
             cur.execute("""CREATE TABLE IF NOT EXISTS users (
-
                 id CHAR(36) PRIMARY KEY,
-
                 email VARCHAR(255) NULL UNIQUE,
-
                 phone VARCHAR(20) NULL UNIQUE,
-
                 name VARCHAR(100) NOT NULL DEFAULT '',
-
                 pass_hash VARCHAR(100) NULL,
-
                 state LONGTEXT NULL,
-
                 chat LONGTEXT NULL,
-
                 created_at BIGINT NOT NULL
-
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""")
 
-        print(f"🗄️  MySQL connected: {MYSQL['host']}:{MYSQL['port']}  database={MYSQL_DB}")
+        print(
+            f"🗄️ MySQL connected: "
+            f"{MYSQL['host']}:{MYSQL['port']} database={MYSQL_DB}"
+        )
 
     except pymysql.err.MySQLError as e:
-
-        raise SystemExit(f"❌ MySQL se connect nahi ho paya: {e}\n"
-
-                         "   -> MySQL chalu hai? .env me MYSQL_HOST / MYSQL_USER / MYSQL_PASSWORD sahi hain?")
-
+        raise SystemExit(
+            f"❌ MySQL connection error: {e}\n"
+            "   -> TiDB host, port, username, password aur SSL certificate check karo."
+        )
 
 
 
@@ -519,30 +524,6 @@ def on_error(e):
         return jsonify({"error": "Something went wrong"}), 500
 
     return "Something went wrong", 500
-
-
-
-
-
-@app.after_request
-
-def cors(resp):
-
-    if request.path == "/" or request.path.endswith(".html"):
-
-        resp.headers["Cache-Control"] = "no-store"
-
-    if CORS_ORIGIN:
-
-        resp.headers["Access-Control-Allow-Origin"] = CORS_ORIGIN
-
-        resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-
-        resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-
-    return resp
-
-
 
 
 
