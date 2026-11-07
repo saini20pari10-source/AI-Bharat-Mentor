@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 // AI Bharat Mentor (ABM) — React frontend for existing Flask server.py
 // Start Flask on :5000 and Vite on :5173. No API keys are hard-coded here.
@@ -40,13 +40,14 @@ const FALLBACK_SKILLS = [
   'Power BI', 'Excel', 'Git', 'GitHub'
 ];
 const KEY = 'abm_react_v1';
+const API_BASE = ['localhost', '127.0.0.1'].includes(window.location.hostname) ? '' : 'https://ai-bharat-mentor-1.onrender.com';
 const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
 const safeText = value => String(value ?? '').trim();
 const imagePath = `${import.meta.env.BASE_URL}founder.png`;
 
 async function api(path, { token = '', headers = {}, ...options } = {}) {
   const isForm = options.body instanceof FormData;
-  const response = await fetch(path, {
+  const response = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
       ...(isForm ? {} : options.body ? { 'Content-Type': 'application/json' } : {}),
@@ -59,6 +60,20 @@ async function api(path, { token = '', headers = {}, ...options } = {}) {
   if (!response.ok) throw new Error(data?.error || `Request failed (HTTP ${response.status})`);
   if (data == null) throw new Error('Unexpected server response. Is Flask running?');
   return data;
+}
+
+function getBrowserId(storage, key) {
+  try {
+    let id = storage.getItem(key);
+    if (!id) {
+      id = window.crypto?.randomUUID?.() ||
+        `abm_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      storage.setItem(key, id);
+    }
+    return id;
+  } catch {
+    return `abm_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  }
 }
 
 function youtubeEmbed(url) {
@@ -114,6 +129,14 @@ function Founder() {
 export default function App() {
   const saved = read(KEY, {});
   const [page, setPage] = useState('home');
+  const [publicStats, setPublicStats] = useState({ registered_users: null, total_visitors: null, ai_sessions: null });
+
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackCategory, setFeedbackCategory] = useState('Overall Experience');
+  const [feedbackName, setFeedbackName] = useState('');
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [feedbackBusy, setFeedbackBusy] = useState(false);
+  const [feedbackSuccess, setFeedbackSuccess] = useState('');
   const [token, setToken] = useState(() => localStorage.getItem('abm_react_token') || '');
   const [account, setAccount] = useState(null);
   const [profile, setProfile] = useState(saved.u || DEFAULT_PROFILE);
@@ -148,7 +171,7 @@ export default function App() {
   const [adminKey, setAdminKey] = useState('');
   const [adminOK, setAdminOK] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
-  const [videoPreview, setVideoPreview] = useState(false);
+  const [, setVideoPreview] = useState(false);
   const [mockKind, setMockKind] = useState('Technical');
   const [mockIndex, setMockIndex] = useState(0);
   const [mockAnswer, setMockAnswer] = useState('');
@@ -184,6 +207,27 @@ export default function App() {
     ? Math.round(100 * aiCompleted.filter(id => aiRoadmap.tasks.some(task => task.id === id)).length / aiRoadmap.tasks.length)
     : 0;
   const userName = account?.name || profile.name || 'Learner';
+
+  useEffect(() => {
+    const visitorId = getBrowserId(localStorage, 'abm_visitor_id');
+    api('/api/public/visit', {
+      method: 'POST',
+      body: JSON.stringify({ visitor_id: visitorId })
+    }).then(() => api('/api/public/stats'))
+      .then(data => setPublicStats(data))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (page !== 'home') return;
+    let cancelled = false;
+    api('/api/public/stats')
+      .then(data => { if (!cancelled) setPublicStats(data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [page]);
+
+
 
   useEffect(() => {
     let cancelled = false;
@@ -310,7 +354,7 @@ export default function App() {
     setChatInput(''); setChatBusy(true);
     try {
       const result = await api('/api/chat', {
-        token, method: 'POST', body: JSON.stringify({ message, lang: language, history, profile })
+        token, method: 'POST', body: JSON.stringify({ message, lang: language, history, profile, session_id: getBrowserId(sessionStorage, 'abm_ai_session_id') })
       });
       setMessages(prev => [...prev, { role: 'assistant', content: result.reply || result.answer || 'No reply returned.' }]);
     } catch (error) {
@@ -406,7 +450,7 @@ export default function App() {
       const response = await api('/api/chat', {
         token,
         method: 'POST',
-        body: JSON.stringify({ message: prompt, lang: language, history: [], profile })
+        body: JSON.stringify({ message: prompt, lang: language, history: [], profile, session_id: getBrowserId(sessionStorage, 'abm_ai_session_id') })
       });
       const feedback = safeText(response.reply || response.answer);
       if (!feedback) throw new Error('Fugu returned an empty response.');
@@ -478,7 +522,7 @@ export default function App() {
     try {
       const reply = await api('/api/chat', {
         token, method: 'POST',
-        body: JSON.stringify({ message: prompt, lang: language, history: [], profile })
+        body: JSON.stringify({ message: prompt, lang: language, history: [], profile, session_id: getBrowserId(sessionStorage, 'abm_ai_session_id') })
       });
       const advice = safeText(reply.reply || reply.answer);
       if (!advice) throw new Error('Fugu returned an empty roadmap.');
@@ -533,7 +577,7 @@ export default function App() {
       const response = await api('/api/chat', {
         token,
         method: 'POST',
-        body: JSON.stringify({ message: prompt, lang: language, history: [], profile })
+        body: JSON.stringify({ message: prompt, lang: language, history: [], profile, session_id: getBrowserId(sessionStorage, 'abm_ai_session_id') })
       });
       const feedback = safeText(response.reply || response.answer);
       if (!feedback) throw new Error('Fugu returned an empty review.');
@@ -581,7 +625,35 @@ export default function App() {
     (type === 'all' || item.kind === type) &&
     [item.title, item.skill, item.description].join(' ').toLowerCase().includes(search.trim().toLowerCase())
   );
-  const mainPages = ['dashboard', 'roadmap', 'library', 'chat', 'skills', 'progress', 'resume', 'mock', 'profile', 'founder'];
+
+
+  async function submitFeedback(e) {
+    e.preventDefault();
+    setFeedbackBusy(true);
+    setFeedbackSuccess('');
+
+    try {
+      const result = await api('/api/feedback', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: feedbackName,
+          rating: Number(feedbackRating),
+          category: feedbackCategory,
+          message: feedbackMessage
+        })
+      });
+
+      setFeedbackSuccess(result.message || 'Thank you for your feedback!');
+      setFeedbackName('');
+      setFeedbackMessage('');
+      setFeedbackRating(5);
+      setFeedbackCategory('Overall Experience');
+    } catch (error) {
+      notify(error.message || 'Feedback submit nahi ho paya.');
+    } finally {
+      setFeedbackBusy(false);
+    }
+  }
 
   function content() {
     switch (page) {
@@ -844,6 +916,53 @@ export default function App() {
           {account && <button className="btn subtle" onClick={logout}>Log out</button>}
         </div>
       </>;
+      case 'feedback': return <>
+        <SectionHeading eyebrow="Your voice matters" title="Share Your Feedback"
+          subtitle="Help us make AI Bharat Mentor better for every student." />
+        <form className="panel feedback-form" onSubmit={submitFeedback}>
+          <h3>How was your experience?</h3>
+          <p className="muted small">Select your rating</p>
+          <div className="feedback-stars" role="group" aria-label="Rating">
+            {[1, 2, 3, 4, 5].map(star => (
+              <button key={star} type="button"
+                className={star <= feedbackRating ? 'selected' : ''}
+                aria-label={`${star} star${star > 1 ? 's' : ''}`}
+                aria-pressed={feedbackRating === star}
+                onClick={() => setFeedbackRating(star)}>★</button>
+            ))}
+          </div>
+          <label>Your name (optional)
+            <input value={feedbackName} maxLength={100}
+              placeholder="Your name"
+              onChange={e => setFeedbackName(e.target.value)} />
+          </label>
+          <label>Feedback category
+            <select value={feedbackCategory}
+              onChange={e => setFeedbackCategory(e.target.value)}>
+              <option>Overall Experience</option>
+              <option>AI Mentor</option>
+              <option>Career Roadmap</option>
+              <option>Study Library</option>
+              <option>Resume & Interview</option>
+              <option>Bug Report</option>
+              <option>Feature Suggestion</option>
+            </select>
+          </label>
+          <label>Your feedback
+            <textarea required minLength={5} maxLength={2000} rows={5}
+              value={feedbackMessage}
+              placeholder="Tell us what you liked or what we can improve..."
+              onChange={e => setFeedbackMessage(e.target.value)} />
+          </label>
+          {feedbackSuccess && <p className="feedback-success" role="status">{feedbackSuccess}</p>}
+          <button className="btn" type="submit" disabled={feedbackBusy}>
+            {feedbackBusy ? 'Submitting...' : 'Submit Feedback'}
+          </button>
+          <button className="btn subtle" type="button" onClick={() => navigate('home')}>
+            Back to Home
+          </button>
+        </form>
+      </>;
       case 'founder': return <Founder />;
       default: return null;
     }
@@ -853,7 +972,26 @@ export default function App() {
     {page === 'home' ? <>
       <header className="landing-header"><button className="brand" onClick={() => navigate('home')}><span className="brand-mark">✦</span><span>AI Bharat Mentor<small>LEARN · GROW · ACHIEVE</small></span></button><nav><button onClick={() => navigate('founder')}>About Founder</button><button onClick={() => navigate('library')}>Study Library</button><button onClick={() => navigate('login')}>Log in</button><button className="btn" onClick={() => navigate(account ? 'dashboard' : 'login')}>Get Started →</button></nav></header>
       <main className="landing-main"><div><span className="eyebrow">AI-powered guidance for Indian students</span><h1>Your career.<br /><span className="gradient-text">Your future.</span><br />Powered by AI.</h1><p>Plan your career path, learn practical skills and prepare for interviews with Fugu — your own AI mentor.</p><div className="hero-actions"><button className="btn big" onClick={() => navigate(account ? 'dashboard' : 'login')}>Start Learning →</button><button className="btn subtle big" onClick={() => navigate('founder')}>Meet the Founder</button></div></div><div className="robot-showcase"><div className="halo" /><span className="fugu">🐡</span><div className="floating-chip">🤖 Meet Fugu AI</div><div className="floating-chip second">📚 Learn · Grow · Achieve</div></div></main>
+      <section className="community-stats" aria-label="AI Bharat Mentor community statistics">
+        <div className="community-stat">
+          <strong>{publicStats.registered_users ?? '—'}</strong>
+          <span>Registered Users</span>
+        </div>
+        <div className="community-stat">
+          <strong>{publicStats.total_visitors ?? '—'}</strong>
+          <span>Total Visitors</span>
+        </div>
+        <div className="community-stat">
+          <strong>{publicStats.ai_sessions ?? '—'}</strong>
+          <span>AI Sessions</span>
+        </div>
+      </section>
       <div className="feature-strip"><span>🧭 Career Roadmaps</span><span>🤖 AI Mentor</span><span>📚 Study Library</span><span>📄 Resume & Interview Tools</span></div>
+      <section className="feedback-invite">
+        <h2>💬 Help us improve AI Bharat Mentor</h2>
+        <p>Your feedback helps us build a better learning experience for students.</p>
+        <button className="btn" onClick={() => navigate('feedback')}>Give Feedback →</button>
+      </section>
       <div className="landing-founder"><Founder /></div>
     </> : page === 'login' ? <main className="auth-shell"><button className="back" onClick={() => navigate('home')}>← Back to Home</button><div className="auth-layout"><div className="auth-intro"><span className="eyebrow">AI Bharat Mentor</span><h1>Learn today.<br /><span className="gradient-text">Lead tomorrow.</span></h1><span className="fugu">🐡</span></div><form className="panel auth-form" onSubmit={authenticate}><h2>{authMode === 'signup' ? 'Create your account' : 'Welcome back'}</h2><p className="muted">Continue your journey toward your goals.</p>{authMode === 'signup' && <label>Full Name<input required minLength={2} autoComplete="name" value={authForm.name} onChange={e => setAuthForm(v => ({ ...v, name: e.target.value }))} /></label>}<label>Email<input type="email" required autoComplete="email" value={authForm.email} onChange={e => setAuthForm(v => ({ ...v, email: e.target.value }))} /></label><label>Password<input type="password" required minLength={6} autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'} value={authForm.password} onChange={e => setAuthForm(v => ({ ...v, password: e.target.value }))} /></label><button className="btn wide" disabled={authBusy}>{authBusy ? 'Please wait...' : authMode === 'signup' ? 'Sign up' : 'Log in'}</button><p className="muted small">{authMode === 'login' ? 'New here?' : 'Already registered?'} <button type="button" className="text-link" onClick={() => setAuthMode(m => m === 'login' ? 'signup' : 'login')}>{authMode === 'login' ? 'Create an account' : 'Log in instead'}</button></p></form></div></main> : <div className="workspace"><aside className="sidebar"><button className="brand" onClick={() => navigate('home')}><span className="brand-mark">✦</span><span>AI Bharat Mentor<small>LEARN · GROW · ACHIEVE</small></span></button><nav className="side-nav" aria-label="App sections">{MENU.map(([icon, key, label]) => <button key={key} className={page === key ? 'active' : ''} onClick={() => navigate(key)}><span className="nav-icon">{icon}</span>{label}</button>)}</nav><div className="sidebar-bottom"><span className="server-dot" />{serverStatus}</div></aside><main className="workspace-main"><header className="workspace-header"><div className="breadcrumb">AI Bharat Mentor <span> / {MENU.find(x => x[1] === page)?.[2] || 'Dashboard'}</span></div><div className="header-right"><select aria-label="AI language" value={language} onChange={e => setLanguage(e.target.value)}><option value="en">English</option><option value="hi">हिन्दी</option><option value="zh">中文</option></select><button className="avatar" onClick={() => navigate('profile')} title="Profile">{userName[0]?.toUpperCase() || 'P'}</button></div></header><div className="page-content">{content()}</div></main></div>}
     {alert && <div role="alert" className="toast"><span>{alert}</span><button aria-label="Dismiss notification" onClick={() => setAlert('')}>×</button></div>}
