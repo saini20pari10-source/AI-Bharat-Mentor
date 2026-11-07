@@ -83,7 +83,6 @@ if PROD and len(SECRET) < 24:
 
 
 app = Flask(__name__, static_folder=None)
-# Career ML API registration
 from career_api import career_bp
 
 app.register_blueprint(career_bp)
@@ -142,7 +141,14 @@ if not re.fullmatch(r"[A-Za-z0-9_]+", MYSQL_DB):
     raise SystemExit("MYSQL_DB me sirf akshar, number aur _ hona chahiye")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CA_PATH = os.path.join(BASE_DIR, "certs", "ca.pem")
+RENDER_CA_PATH = "/etc/secrets/ca.pem"
+LOCAL_CA_PATH = os.path.join(BASE_DIR, "certs", "ca.pem")
+
+CA_PATH = (
+    RENDER_CA_PATH
+    if os.path.isfile(RENDER_CA_PATH)
+    else LOCAL_CA_PATH
+)
 
 MYSQL = dict(
     host=os.getenv("MYSQL_HOST", "127.0.0.1"),
