@@ -1,0 +1,31 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <radialGradient id="fish" cx="35%" cy="25%">
+      <stop offset="0%" stop-color="#8ffaff"/>
+      <stop offset="65%" stop-color="#168cff"/>
+      <stop offset="100%" stop-color="#073dba"/>
+    </radialGradient>
+  </defs>
+  <g fill="#168cff">
+    <path d="M35 90 L8 65 L16 115 Z"/>
+    <path d="M165 90 L192 65 L184 115 Z"/>
+    <path d="M75 35 L62 12 L91 28 Z"/>
+    <path d="M125 35 L138 12 L109 28 Z"/>
+  </g>
+  <circle cx="100" cy="100" r="70" fill="url(#fish)" stroke="#65f7ff" stroke-width="5"/>
+  <g fill="#d5ffff">
+    <circle cx="50" cy="75" r="5"/><circle cx="150" cy="75" r="5"/>
+    <circle cx="45" cy="115" r="4"/><circle cx="155" cy="115" r="4"/>
+    <circle cx="75" cy="38" r="4"/><circle cx="125" cy="38" r="4"/>
+  </g>
+  <ellipse cx="75" cy="88" rx="17" ry="21" fill="white"/>
+  <ellipse cx="125" cy="88" rx="17" ry="21" fill="white"/>
+  <circle cx="80" cy="90" r="10" fill="#061b55"/>
+  <circle cx="130" cy="90" r="10" fill="#061b55"/>
+  <circle cx="83" cy="85" r="4" fill="white"/>
+  <circle cx="133" cy="85" r="4" fill="white"/>
+  <ellipse cx="58" cy="115" rx="12" ry="7" fill="#ff9bc8"/>
+  <ellipse cx="142" cy="115" rx="12" ry="7" fill="#ff9bc8"/>
+  <path d="M78 120 Q100 145 122 120 Q100 157 78 120" fill="#fff"/>
+  <path d="M78 120 Q100 145 122 120" fill="none" stroke="#073dba" stroke-width="4"/>
+</svg>

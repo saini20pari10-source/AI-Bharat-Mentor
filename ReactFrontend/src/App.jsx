@@ -1,53 +1,23 @@
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from "react";
+import founderPhoto from "./founder.jpg";
+import fuguMascot from "./assets/fugu-mascot.svg";
 
-// AI Bharat Mentor (ABM) — React frontend for existing Flask server.py
-// Start Flask on :5000 and Vite on :5173. No API keys are hard-coded here.
+// AI Bharat Mentor (ABM)
+const API_BASE = ['localhost', '127.0.0.1'].includes(window.location.hostname) 
+  ? '' 
+  : 'https://ai-bharat-mentor-1.onrender.com';
 
-const MENU = [
-  ['🏠', 'dashboard', 'Dashboard'], ['🧭', 'roadmap', 'Career Roadmap'],
-  ['📚', 'library', 'Study Library'], ['🤖', 'chat', 'Fugu AI Mentor'],
-  ['📊', 'skills', 'Skill Analysis'], ['📈', 'progress', 'Progress'],
-  ['📄', 'resume', 'Resume Builder'], ['🎤', 'mock', 'Mock Interview'],
-  ['👤', 'profile', 'Profile & Settings'], ['✨', 'founder', 'About Founder']
-];
-const ROADMAP = [
-  ['Python Basics', 'Learn variables, loops, functions and files'],
-  ['HTML & CSS', 'Build your first responsive web page'],
-  ['JavaScript', 'Add interactions to websites'],
-  ['Git & GitHub', 'Version control and publish code'],
-  ['Data Structures', 'Practice arrays, stacks, lists and trees'],
-  ['React', 'Build component-based interfaces'],
-  ['MySQL & SQL', 'Store and query relational data'],
-  ['Flask APIs', 'Connect frontend and backend'],
-  ['AI Projects', 'Build useful projects using local models'],
-  ['Portfolio', 'Showcase projects and write your resume']
-];
-const QUESTIONS = {
-  Technical: ['What is a REST API?', 'Explain Python lists vs tuples.', 'What is a primary key in SQL?', 'What is React state?'],
-  HR: ['Tell me about yourself.', 'Why do you want this internship?', 'What motivates you?', 'Where do you see yourself in five years?'],
-  Behavioral: ['Describe a problem you solved.', 'How do you handle deadlines?', 'Tell me about something new you learned.', 'What would you do after receiving criticism?']
+const KEY = 'abm_react_v2';
+
+/* ---------------- Helpers & Storage ---------------- */
+const readLS = (key, fallback) => {
+  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
+  catch { return fallback; }
 };
-const DEFAULT_PROFILE = {
-  name: '', full: '', email: '', edu: 'BCA Student', goal: 'Software Developer',
-  city: 'Delhi', skills: ['Python', 'HTML', 'CSS']
-};
-const DEFAULT_RESUME = { name: '', title: 'BCA Student', education: 'Bachelor of Computer Applications', skills: 'Python, Flask, SQL, React', projects: 'AI Bharat Mentor — AI-powered career guidance platform', summary: 'Motivated student developer building accessible AI learning products.' };
-const FALLBACK_SKILLS = [
-  'Python', 'Java', 'C', 'C++', 'C#', 'JavaScript', 'TypeScript',
-  'HTML', 'CSS', 'SQL', 'MySQL', 'PostgreSQL', 'MongoDB',
-  'React', 'Node.js', 'Flask', 'Django', 'Machine Learning',
-  'Deep Learning', 'Linux', 'Networking', 'Cybersecurity',
-  'Power BI', 'Excel', 'Git', 'GitHub'
-];
-const KEY = 'abm_react_v1';
-const API_BASE = ['localhost', '127.0.0.1'].includes(window.location.hostname) ? '' : 'https://ai-bharat-mentor-1.onrender.com';
-const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
-const safeText = value => String(value ?? '').trim();
-const imagePath = `${import.meta.env.BASE_URL}founder.png`;
 
 async function api(path, { token = '', headers = {}, ...options } = {}) {
   const isForm = options.body instanceof FormData;
-  const response = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
       ...(isForm ? {} : options.body ? { 'Content-Type': 'application/json' } : {}),
@@ -55,25 +25,11 @@ async function api(path, { token = '', headers = {}, ...options } = {}) {
       ...headers
     }
   });
-  const contentType = response.headers.get('content-type') || '';
-  const data = contentType.includes('application/json') ? await response.json() : null;
-  if (!response.ok) throw new Error(data?.error || `Request failed (HTTP ${response.status})`);
-  if (data == null) throw new Error('Unexpected server response. Is Flask running?');
+  const contentType = res.headers.get('content-type') || '';
+  const data = contentType.includes('application/json') ? await res.json() : null;
+  if (!res.ok) throw new Error(data?.error || `Request failed (HTTP ${res.status})`);
+  if (data == null) throw new Error('Unexpected server response.');
   return data;
-}
-
-function getBrowserId(storage, key) {
-  try {
-    let id = storage.getItem(key);
-    if (!id) {
-      id = window.crypto?.randomUUID?.() ||
-        `abm_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-      storage.setItem(key, id);
-    }
-    return id;
-  } catch {
-    return `abm_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  }
 }
 
 function youtubeEmbed(url) {
@@ -90,338 +46,399 @@ function youtubeEmbed(url) {
   } catch { return ''; }
 }
 
-function Resource({ item, canDelete, onDelete }) {
+/* ---------------- Fugu Pufferfish SVG Component ---------------- */
+function Fish({ size = 180, float = true }) {
+  const spikes = [...Array(16)].map((_, i) => {
+    const a = (i / 16) * 2 * Math.PI;
+    const p = (r, d) => [100 + r * 62 * Math.cos(a + d), 90 + r * 55 * Math.sin(a + d)].join(",");
+    return [p(1, -0.1), p(1.24, 0), p(1, 0.1)].join(" ");
+  });
+  return (
+    <svg className={float ? "fish-float" : ""} width={size} viewBox="0 0 210 180" style={{ overflow: "visible" }}>
+      <defs>
+        <linearGradient id="fb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#7ea6f5" /><stop offset="1" stopColor="#3b6fe0" /></linearGradient>
+        <linearGradient id="fl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#f4f8ff" /><stop offset="1" stopColor="#c9dcff" /></linearGradient>
+      </defs>
+      <polygon points="42,90 6,52 14,90 6,128" fill="#5b8cff" />
+      {spikes.map((pts, i) => <polygon key={i} points={pts} fill="#22d3ee" opacity=".85" />)}
+      <ellipse cx="100" cy="90" rx="62" ry="55" fill="url(#fb)" />
+      <ellipse cx="104" cy="112" rx="44" ry="30" fill="url(#fl)" />
+      <path d="M92 52 Q100 30 116 50 Q104 54 92 52Z" fill="#5b8cff" />
+      <path d="M96 138 Q104 160 120 138Z" fill="#5b8cff" />
+      <ellipse cx="96" cy="100" rx="14" ry="9" fill="#5b8cff" transform="rotate(25 96 100)" />
+      <circle cx="132" cy="78" r="13" fill="#fff" /><circle cx="135" cy="78" r="7" fill="#0a1538" /><circle cx="137" cy="75" r="2.4" fill="#fff" />
+      <circle cx="160" cy="98" r="7" fill="#0a1538" />
+      <path d="M152 112 Q162 120 170 110" stroke="#0a1538" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <text x="106" y="122" textAnchor="middle" fontFamily="Inter" fontWeight="700" fontSize="20" fill="#3b6fe0">F</text>
+    </svg>
+  );
+}
+
+const Avatar = ({ z = 42 }) => (
+  <div className="avatar-fugu" style={{ width: z, height: z }}>
+    <Fish size={z * 1.1} float={false} />
+  </div>
+);
+
+/* ---------------- Static Config ---------------- */
+const MENU = [
+  ['\u25a6', 'dashboard', 'Dashboard'],
+  ['\u25c8', 'roadmap', 'Career Roadmap'],
+  ['\u25a4', 'library', 'Study Library'],
+  ['', 'chat', 'Fugu AI Mentor'],
+  ['\u25c8', 'skills', 'Skill Analysis'],
+  ['\u2197', 'progress', 'Progress'],
+  ['\u25a3', 'resume', 'Resume Builder'],
+  ['\u25c9', 'mock', 'Mock Interview'],
+  ['\u2699', 'profile', 'Profile & Settings'],
+  ['\u2726', 'founder', 'About Founder']
+];
+
+const QUESTIONS = {
+  Technical: ['What is a REST API?', 'Explain Python lists vs tuples.', 'What is a primary key in SQL?', 'What is React state?'],
+  HR: ['Tell me about yourself.', 'Why do you want this internship?', 'What motivates you?', 'Where do you see yourself in 5 years?'],
+  Behavioral: ['Describe a problem you solved.', 'How do you handle deadlines?', 'Tell me about a challenge you overcame.', 'How do you accept criticism?']
+};
+
+const LANGUAGE_CODES = ['aa', 'ab', 'ae', 'af', 'ak', 'am', 'an', 'ar', 'as', 'av', 'ay', 'az', 'ba', 'be', 'bg', 'bh', 'bi', 'bm', 'bn', 'bo', 'br', 'bs', 'ca', 'ce', 'ch', 'co', 'cr', 'cs', 'cu', 'cv', 'cy', 'da', 'de', 'dv', 'dz', 'ee', 'el', 'en', 'eo', 'es', 'et', 'eu', 'fa', 'ff', 'fi', 'fj', 'fo', 'fr', 'fy', 'ga', 'gd', 'gl', 'gn', 'gu', 'gv', 'ha', 'he', 'hi', 'ho', 'hr', 'ht', 'hu', 'hy', 'hz', 'ia', 'id', 'ie', 'ig', 'ii', 'ik', 'io', 'is', 'it', 'iu', 'ja', 'jv', 'ka', 'kg', 'ki', 'kj', 'kk', 'kl', 'km', 'kn', 'ko', 'kr', 'ks', 'ku', 'kv', 'kw', 'ky', 'la', 'lb', 'lg', 'li', 'ln', 'lo', 'lt', 'lu', 'lv', 'mg', 'mh', 'mi', 'mk', 'ml', 'mn', 'mr', 'ms', 'mt', 'my', 'na', 'nb', 'nd', 'ne', 'ng', 'nl', 'nn', 'no', 'nr', 'nv', 'ny', 'oc', 'oj', 'om', 'or', 'os', 'pa', 'pi', 'pl', 'ps', 'pt', 'qu', 'rm', 'rn', 'ro', 'ru', 'rw', 'sa', 'sc', 'sd', 'se', 'sg', 'si', 'sk', 'sl', 'sm', 'sn', 'so', 'sq', 'sr', 'ss', 'st', 'su', 'sv', 'sw', 'ta', 'te', 'tg', 'th', 'ti', 'tk', 'tl', 'tn', 'to', 'tr', 'ts', 'tt', 'tw', 'ty', 'ug', 'uk', 'ur', 'uz', 've', 'vi', 'vo', 'wa', 'wo', 'xh', 'yi', 'yo', 'za', 'zh', 'zu', 'en-US', 'en-GB', 'en-IN', 'en-AU', 'en-CA', 'en-NZ', 'zh-CN', 'zh-TW', 'zh-HK', 'pt-BR', 'pt-PT', 'es-ES', 'es-MX', 'es-AR', 'fr-FR', 'fr-CA', 'ar-SA', 'ar-EG', 'ar-AE', 'de-DE', 'de-AT', 'de-CH', 'pa-IN', 'pa-PK', 'sr-Latn', 'sr-Cyrl', 'uz-Latn', 'uz-Cyrl', 'mn-MN', 'mn-CN', 'sw-KE', 'sw-TZ'].map(code => code);
+const LANGUAGE_NAMES = new Intl.DisplayNames(["en"], { type: "language" });
+const LANG_MAP = Object.fromEntries(LANGUAGE_CODES.map(code => {
+  try { return [code, LANGUAGE_NAMES.of(code) || code]; }
+  catch { return [code, code]; }
+}));
+LANG_MAP.auto = "Auto Detect";
+LANG_MAP.hinglish = "Hinglish";
+
+const DEFAULT_PROFILE = { name: 'Student', full: 'Student', email: '', edu: 'BCA Student', goal: 'Software Developer', city: 'Delhi', skills: ['Python', 'HTML', 'CSS'] };
+const DEFAULT_RESUME = { name: '', title: 'BCA Student', education: 'Bachelor of Computer Applications', skills: 'Python, Flask, SQL, React', projects: 'AI Bharat Mentor Ã¢â‚¬â€ AI-powered career guidance platform', summary: 'Motivated student developer building accessible AI learning products.' };
+const FALLBACK_SKILLS = [
+  'Python', 'Java', 'C', 'C++', 'JavaScript',
+  'HTML', 'CSS', 'React', 'Flask', 'Django',
+  'SQL', 'MySQL', 'Excel', 'Power BI',
+  'Machine Learning', 'Deep Learning',
+  'Data Analysis', 'Statistics',
+  'Communication', 'Problem Solving',
+  'Git', 'GitHub', 'Data Structures',
+  'Cloud Computing', 'Cybersecurity'
+];
+/* ---------------- Sub-Components ---------------- */
+function ResourceCard({ item, canDelete, onDelete }) {
   const [playing, setPlaying] = useState(false);
   const fileUrl = item.fileUrl || item.file_url || (item.kind !== 'link' && item.id && !item.url ? `/api/library/${encodeURIComponent(item.id)}/file` : '');
   const url = item.url || fileUrl;
   const embed = youtubeEmbed(item.url || '');
   const isVideoFile = item.kind === 'video' && Boolean(fileUrl) && !item.url;
-  const kindIcon = { video: '🎬', document: '📄', image: '🖼️', link: '🔗' }[item.kind] || '📚';
-  return <article className="panel resource-card">
-    <div className="resource-heading"><span className="icon-tile">{kindIcon}</span><span className="muted small">{item.skill || 'General'} · {item.kind || 'Resource'}</span></div>
-    <h3>{item.title}</h3><p className="muted">{item.description || 'Explore this learning resource.'}</p>
-    <div className="resource-actions">
-      {embed && <button className="btn" onClick={() => setPlaying(x => !x)}>{playing ? 'Hide player' : '▶ Play here'}</button>}
-      {url && <a className="btn subtle" href={url} target="_blank" rel="noopener noreferrer">{item.kind === 'video' ? '↗ Watch / open' : '↗ View material'}</a>}
-      {canDelete && <button className="btn danger" onClick={() => onDelete(item)}>Delete</button>}
+  const kindIcon = { video: '??', document: '??', image: '???', link: '??' }[item.kind] || '??';
+  
+  return (
+    <div className="panel card">
+      <div className="sp" style={{ marginBottom: 8 }}>
+        <span className="chip">{kindIcon} {item.kind || 'Resource'}</span>
+        <span className="muted small">{item.skill || 'General'}</span>
+      </div>
+      <h3 style={{ fontSize: 16, margin: '6px 0' }}>{item.title}</h3>
+      <p className="muted small">{item.description || 'Explore this learning material.'}</p>
+      <div className="row" style={{ marginTop: 12, gap: 8 }}>
+        {embed && <button className="btn out small" onClick={() => setPlaying(!playing)}>{playing ? 'Hide' : '? Play'}</button>}
+        {url && <a className="btn small" href={url} target="_blank" rel="noopener noreferrer">Open ?</a>}
+        {canDelete && <button className="btn danger small" onClick={() => onDelete(item)}>Delete</button>}
+      </div>
+      {playing && embed && <div className="video-wrap" style={{ marginTop: 10 }}><iframe title={item.title} src={embed} allowFullScreen /></div>}
+      {playing && !embed && isVideoFile && <video controls className="local-video" src={fileUrl} style={{ width: '100%', marginTop: 10 }}>Video unavailable.</video>}
     </div>
-    {playing && embed && <div className="video-wrap"><iframe title={`${item.title} player`} src={embed} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen /></div>}
-    {playing && !embed && isVideoFile && <video controls className="local-video" src={fileUrl}>Video could not be played.</video>}
-  </article>;
+  );
 }
 
-function Tag({ children }) { return <span className="tag">{children}</span>; }
-function SectionHeading({ eyebrow, title, subtitle }) { return <div className="section-heading"><span className="eyebrow">{eyebrow}</span><h2>{title}</h2>{subtitle && <p className="muted">{subtitle}</p>}</div>; }
-function Founder() {
-  return <div>
-    <SectionHeading eyebrow="The person behind the project" title="Meet the Founder" subtitle="Building technology that makes learning and career decisions easier for students." />
-    <div className="panel founder-grid">
-      <img src={imagePath} className="founder-photo" alt="Portrait provided by the AI Bharat Mentor founder" />
-      <div><span className="eyebrow">Founder & Developer · AI Bharat Mentor</span><h2>Pari Saini</h2>
-        <p>Hi! I'm Pari, a second-year BCA student from Delhi and the solo founder of <strong>AI Bharat Mentor</strong>. I'm designing and developing this platform to help students explore careers, improve skills, and learn with accessible technology.</p>
-        <p>My work brings together Python, Flask, MySQL, local AI through Ollama, product design and personalized learning. I want practical guidance to be available to students regardless of their starting point.</p>
-        <div className="tags"><Tag>🎓 BCA Student</Tag><Tag>💻 Python & Flask</Tag><Tag>🗄️ MySQL</Tag><Tag>🤖 Local AI</Tag><Tag>🚀 Solo Founder</Tag></div>
+function FounderSection({ navigate }) {
+  return (
+    <div className="founder-wrap">
+      <div className="founder-img-col">
+        <img src={founderPhoto} alt="Pari Saini" style={{ width: "100%", maxWidth: 420, height: "auto", objectFit: "contain", objectPosition: "center", borderRadius: 14, border: "2px solid var(--p)", background: "#070b1e", display: "block" }} />
+      </div>
+      <div>
+        <span className="founder-kicker">Founder &amp; Developer Ã‚Â· AI Bharat Mentor</span>
+        <h2 className="founder-name">Pari Saini</h2>
+        <p className="founder-copy">Hi! I'm Pari, a second-year BCA student from Delhi and the solo founder of <strong>AI Bharat Mentor</strong>. I am building a career-guidance and learning platform to help students explore careers, develop skills, and prepare for their future.</p>
+        <p className="founder-copy">I work on Python, Flask backend, MySQL, and FuguÃ¢â‚¬â€a local AI mentor powered by Ollama. My goal is to make career guidance practical, beginner-friendly, and accessible for everyone.</p>
+        <div className="founder-chips">
+          <span>?? BCA Student</span>
+          <span>?? Python &amp; Flask</span>
+          <span>??? MySQL</span>
+          <span>?? Local AI</span>
+          <span>?? Solo Founder</span>
+        </div>
+        {navigate && <button className="btn" style={{ marginTop: 14 }} onClick={() => navigate('dashboard')}>Explore Workspace ?</button>}
       </div>
     </div>
-  </div>;
+  );
 }
 
+/* ---------------- Main App Component ---------------- */
 export default function App() {
-  const saved = read(KEY, {});
+  const saved = readLS(KEY, {});
   const [page, setPage] = useState('home');
-  const [publicStats, setPublicStats] = useState({ registered_users: null, total_visitors: null, ai_sessions: null });
-
-  const [feedbackRating, setFeedbackRating] = useState(5);
-  const [feedbackCategory, setFeedbackCategory] = useState('Overall Experience');
-  const [feedbackName, setFeedbackName] = useState('');
-  const [feedbackMessage, setFeedbackMessage] = useState('');
-  const [feedbackBusy, setFeedbackBusy] = useState(false);
-  const [feedbackSuccess, setFeedbackSuccess] = useState('');
   const [token, setToken] = useState(() => localStorage.getItem('abm_react_token') || '');
   const [account, setAccount] = useState(null);
   const [profile, setProfile] = useState(saved.u || DEFAULT_PROFILE);
   const [done, setDone] = useState(saved.dn || []);
   const [resume, setResume] = useState(saved.rs || DEFAULT_RESUME);
   const [mockHistory, setMockHistory] = useState(saved.mh || []);
-  const [bookmarks, setBookmarks] = useState(saved.bm || []);
-  // lp is an existing user-state key in server.py. Keep other lp fields untouched.
-  const [learningState, setLearningState] = useState(() =>
-    saved.lp && typeof saved.lp === 'object' && !Array.isArray(saved.lp) ? saved.lp : {});
-  const [roadmapGoal, setRoadmapGoal] = useState(() =>
-    saved.lp?.fuguRoadmap?.goal || saved.u?.goal || DEFAULT_PROFILE.goal);
-  const [roadmapHours, setRoadmapHours] = useState(() =>
-    Number(saved.lp?.fuguRoadmap?.hours) || 2);
-  const [roadmapBusy, setRoadmapBusy] = useState(false);
-  const [roadmapError, setRoadmapError] = useState('');
-  const roadmapRequest = useRef(0);
+  const [learningState, setLearningState] = useState(saved.lp || {});
+  
   const [language, setLanguage] = useState('en');
-  const [alert, setAlert] = useState('');
+  const [toast, setToast] = useState('');
   const [authMode, setAuthMode] = useState('login');
-  const [authForm, setAuthForm] = useState({ name: '', email: '', password: '' });
+  const [authForm, setAuthForm] = useState({ name: '', email: '', password: '', edu: '', goal: '', city: '' });
   const [authBusy, setAuthBusy] = useState(false);
+
+  // Chat State
   const [chatInput, setChatInput] = useState('');
-  const [messages, setMessages] = useState([{ role: 'assistant', content: "Hi! I'm Fugu, your AI career mentor. Tell me your goal." }]);
+  const [messages, setMessages] = useState([{ role: 'assistant', content: "Hi! I'm Fugu ??, your AI career mentor. Ask me anything about your career or skills!" }]);
   const [chatBusy, setChatBusy] = useState(false);
+  const [chatLanguage, setChatLanguage] = useState('auto');
+  const [translating, setTranslating] = useState({});
+
+  // Library State
   const [library, setLibrary] = useState([]);
-  const [libError, setLibError] = useState('');
   const [libBusy, setLibBusy] = useState(false);
-  const [search, setSearch] = useState('');
-  const [type, setType] = useState('all');
-  const [adminOpen, setAdminOpen] = useState(false);
   const [adminKey, setAdminKey] = useState('');
   const [adminOK, setAdminOK] = useState(false);
-  const [uploadBusy, setUploadBusy] = useState(false);
-  const [, setVideoPreview] = useState(false);
-  const [mockKind, setMockKind] = useState('Technical');
-  const [mockIndex, setMockIndex] = useState(0);
-  const [mockAnswer, setMockAnswer] = useState('');
-  const [mockAnswers, setMockAnswers] = useState([]);
-  const [mockRunning, setMockRunning] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(90);
-  const [serverStatus, setServerStatus] = useState('Checking server...');
 
-  // Career ML selection + API result
-  const [careerCatalog, setCareerCatalog] = useState([]);
+  // Roadmap State
+  const [roadmapGoal, setRoadmapGoal] = useState(profile.goal);
+  const [roadmapBusy, setRoadmapBusy] = useState(false);
+
+  // Career Analysis State
+  const [careerSkills, setCareerSkills] = useState([]);
   const [careerSelected, setCareerSelected] = useState([]);
-  const [careerSearch, setCareerSearch] = useState('');
-  const [careerCatalogBusy, setCareerCatalogBusy] = useState(false);
+  const [careerLoading, setCareerLoading] = useState(false);
   const [careerBusy, setCareerBusy] = useState(false);
   const [careerError, setCareerError] = useState('');
   const [careerResult, setCareerResult] = useState(null);
   const [careerAdvice, setCareerAdvice] = useState('');
   const [careerAdviceBusy, setCareerAdviceBusy] = useState(false);
   const [careerAdviceError, setCareerAdviceError] = useState('');
-  const [mockReviewingId, setMockReviewingId] = useState(null);
   const careerAdviceRequest = useRef(0);
 
+  // Mock State
+  const [mockKind, setMockKind] = useState('Technical');
+  const [mockIndex, setMockIndex] = useState(0);
+  const [mockAnswer, setMockAnswer] = useState('');
+  const [mockAnswers, setMockAnswers] = useState([]);
+  const [mockRunning, setMockRunning] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(90);
+
   const cloudReady = useRef(false);
-  const firstRender = useRef(true);
 
-  const notify = (msg) => { setAlert(msg); };
-  const navigate = p => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-  const percent = Math.round(done.length / ROADMAP.length * 100);
-  const aiRoadmap = learningState?.fuguRoadmap && Array.isArray(learningState.fuguRoadmap.tasks)
-    ? learningState.fuguRoadmap : null;
-  const aiCompleted = Array.isArray(aiRoadmap?.completed) ? aiRoadmap.completed : [];
-  const aiPercent = aiRoadmap?.tasks?.length
-    ? Math.round(100 * aiCompleted.filter(id => aiRoadmap.tasks.some(task => task.id === id)).length / aiRoadmap.tasks.length)
-    : 0;
-  const userName = account?.name || profile.name || 'Learner';
+  const notify = (msg) => { setToast(msg); setTimeout(() => setToast(''), 4000); };
+  const navigate = (p) => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 
+  // Init & Sync
   useEffect(() => {
-    const visitorId = getBrowserId(localStorage, 'abm_visitor_id');
-    api('/api/public/visit', {
-      method: 'POST',
-      body: JSON.stringify({ visitor_id: visitorId })
-    }).then(() => api('/api/public/stats'))
-      .then(data => setPublicStats(data))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    if (page !== 'home') return;
-    let cancelled = false;
-    api('/api/public/stats')
-      .then(data => { if (!cancelled) setPublicStats(data); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [page]);
-
-
-
-  useEffect(() => {
-    let cancelled = false;
     async function init() {
-      try {
-        const health = await api('/api/health');
-        if (!cancelled) setServerStatus(health.status === 'ok' ? 'Flask online' : 'Server responded');
-      } catch { if (!cancelled) setServerStatus('Flask offline — run python server.py'); }
       if (!token) { cloudReady.current = true; return; }
       try {
         const [me, state] = await Promise.all([api('/api/me', { token }), api('/api/state', { token })]);
-        if (cancelled) return;
         setAccount(me);
         if (state.u) setProfile(state.u);
         if (Array.isArray(state.dn)) setDone(state.dn);
         if (state.rs) setResume(state.rs);
         if (Array.isArray(state.mh)) setMockHistory(state.mh);
-        if (Array.isArray(state.bm)) setBookmarks(state.bm);
-        if (state.lp && typeof state.lp === 'object' && !Array.isArray(state.lp)) {
-          setLearningState(state.lp);
-          if (state.lp.fuguRoadmap?.goal) setRoadmapGoal(state.lp.fuguRoadmap.goal);
-          if (state.lp.fuguRoadmap?.hours) setRoadmapHours(Number(state.lp.fuguRoadmap.hours));
-        }
-        navigate('dashboard');
-      } catch (error) {
-        if (!cancelled) {
-          localStorage.removeItem('abm_react_token');
-          setToken('');
-          if (/401|log in/i.test(error.message)) notify('Session expired. Please log in.');
-        }
+        if (state.lp) setLearningState(state.lp);
+      } catch (err) {
+        localStorage.removeItem('abm_react_token');
+        setToken('');
       } finally { cloudReady.current = true; }
     }
     init();
-    return () => { cancelled = true; };
-  }, []); // Session check happens once; regular state saves are handled below.
+  }, [token]);
 
   useEffect(() => {
-    localStorage.setItem(KEY, JSON.stringify({ u: profile, dn: done, rs: resume, mh: mockHistory, bm: bookmarks, lp: learningState }));
-    if (firstRender.current) { firstRender.current = false; return; }
+    localStorage.setItem(KEY, JSON.stringify({ u: profile, dn: done, rs: resume, mh: mockHistory, lp: learningState }));
     if (!token || !cloudReady.current) return;
-    const timer = setTimeout(() => {
-      api('/api/state', {
-        token, method: 'PUT', body: JSON.stringify({ u: profile, dn: done, rs: resume, mh: mockHistory, bm: bookmarks, lp: learningState })
-      }).catch(() => notify('Changes saved locally; server sync failed.'));
-    }, 900);
-    return () => clearTimeout(timer);
-  }, [profile, done, resume, mockHistory, bookmarks, learningState, token]);
+    const t = setTimeout(() => {
+      api('/api/state', { token, method: 'PUT', body: JSON.stringify({ u: profile, dn: done, rs: resume, mh: mockHistory, lp: learningState }) }).catch(() => {});
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [profile, done, resume, mockHistory, learningState, token]);
 
   useEffect(() => {
     if (page === 'library') refreshLibrary();
   }, [page]);
 
   useEffect(() => {
-    if (page !== 'skills' || careerCatalog.length) return;
-    let active = true;
-    setCareerCatalogBusy(true);
-    setCareerError('');
-    api('/api/career/skills')
-      .then(data => {
-        if (!active) return;
-        const skills = Array.isArray(data.skills) ? data.skills : [];
-        if (!skills.length) throw new Error('Career ML skills list is empty.');
-        setCareerCatalog(skills);
-        setCareerSelected(prev => prev.length ? prev :
-          (profile.skills || []).filter(s => skills.includes(s)));
-      })
-      .catch(err => {
-        if (active) {
-          setCareerCatalog(FALLBACK_SKILLS);
-          setCareerSelected(prev => prev.length ? prev :
-            (profile.skills || []).filter(skill => FALLBACK_SKILLS.includes(skill)));
-          setCareerError(`Career ML is not responding (${err.message}). You can still select skills and ask Fugu AI below.`);
-        }
-      })
-      .finally(() => { if (active) setCareerCatalogBusy(false); });
-    return () => { active = false; };
-  }, [page, careerCatalog.length]);
-
-
-  useEffect(() => {
     if (!mockRunning) return;
     const interval = setInterval(() => setTimeLeft(n => Math.max(0, n - 1)), 1000);
     return () => clearInterval(interval);
   }, [mockRunning, mockIndex]);
-  useEffect(() => { if (mockRunning && timeLeft === 0) advanceMock(); }, [mockRunning, timeLeft]);
 
-  async function authenticate(event) {
-    event.preventDefault();
+  useEffect(() => {
+    let active = true;
+    setCareerLoading(true);
+
+    api('/api/career/skills')
+      .then(data => {
+        if (active) {
+          setCareerSkills(Array.isArray(data.skills) ? data.skills : []);
+        }
+      })
+      .catch(err => {
+        if (active) setCareerError('Could not load career skills: ' + err.message);
+      })
+      .finally(() => {
+        if (active) setCareerLoading(false);
+      });
+
+    return () => { active = false; };
+  }, []);
+
+  // Auth Handler
+  async function handleAuth(e) {
+    e.preventDefault();
     setAuthBusy(true);
     try {
-      const signup = authMode === 'signup';
-      const result = await api(`/api/auth/${signup ? 'signup' : 'login'}`, {
-        method: 'POST', body: JSON.stringify(authForm)
-      });
-      localStorage.setItem('abm_react_token', result.token);
-      setToken(result.token);
-      setAccount(result.user);
-      const state = result.state || {};
-      setProfile(state.u || { ...profile, name: result.user.name || authForm.name, full: result.user.name || authForm.name, email: result.user.email });
-      if (Array.isArray(state.dn)) setDone(state.dn);
-      if (state.rs) setResume(state.rs);
-      if (Array.isArray(state.mh)) setMockHistory(state.mh);
-      cloudReady.current = true;
-      setAuthForm({ name: '', email: '', password: '' });
+      const isSignup = authMode === 'signup';
+      const res = await api(`/api/auth/${isSignup ? 'signup' : 'login'}`, { method: 'POST', body: authForm });
+      localStorage.setItem('abm_react_token', res.token);
+      setToken(res.token);
+      setAccount(res.user);
+      if (res.state?.u) setProfile(res.state.u);
+      else setProfile(prev => ({ ...prev, name: res.user.name || authForm.name, email: res.user.email }));
+      notify(isSignup ? 'Account created successfully!' : 'Welcome back!');
       navigate('dashboard');
-      notify(signup ? 'Account created successfully.' : 'Welcome back!');
-    } catch (error) { notify(error.message); }
+    } catch (err) { notify(err.message); }
     finally { setAuthBusy(false); }
   }
+
   function logout() {
     localStorage.removeItem('abm_react_token');
-    cloudReady.current = false;
-    setToken(''); setAccount(null); setMessages([{ role: 'assistant', content: 'Hi! I am Fugu. How can I help?' }]);
+    setToken(''); setAccount(null);
     navigate('home'); notify('Logged out.');
-    cloudReady.current = true;
   }
 
-  async function sendMessage(event) {
-    event.preventDefault();
+  // Fugu AI Chat Handler
+  async function sendMessage(e) {
+    e?.preventDefault();
     const message = chatInput.trim();
     if (!message || chatBusy) return;
-    const history = messages.filter(m => m.role === 'user' || m.role === 'assistant').slice(-8);
     setMessages(prev => [...prev, { role: 'user', content: message }]);
     setChatInput(''); setChatBusy(true);
     try {
-      const result = await api('/api/chat', {
-        token, method: 'POST', body: JSON.stringify({ message, lang: language, history, profile, session_id: getBrowserId(sessionStorage, 'abm_ai_session_id') })
+      const res = await api('/api/chat', {
+        token, method: 'POST',
+        body: JSON.stringify({ message, lang: chatLanguage === "auto" ? "auto" : (LANG_MAP[chatLanguage] || chatLanguage), history: messages.slice(-6), profile })
       });
-      setMessages(prev => [...prev, { role: 'assistant', content: result.reply || result.answer || 'No reply returned.' }]);
-    } catch (error) {
-      setMessages(prev => [...prev, { role: 'assistant', content: `⚠ ${error.message}. Check Ollama and your login.` }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: res.reply || res.answer || 'No response.' }]);
+    } catch (err) {
+      setMessages(prev => [...prev, { role: 'assistant', content: `?? ${err.message}. Please check server/Ollama connection.` }]);
     } finally { setChatBusy(false); }
   }
 
-  async function refreshLibrary() {
-    setLibBusy(true); setLibError('');
+  async function translateMessage(index) {
+    const item = messages[index];
+    if (!item || translating[index]) return;
+    setTranslating(prev => ({ ...prev, [index]: true }));
     try {
-      const results = await api('/api/library');
-      if (!Array.isArray(results)) throw new Error('The library API did not return a list.');
-      setLibrary(results);
-    } catch (error) { setLibError(`${error.message} — Check that library.py is loaded by Flask.`); }
-    finally { setLibBusy(false); }
-  }
-  async function verifyAdmin(event) {
-    event.preventDefault();
-    try {
-      await api('/api/library/admin-check', { headers: { 'X-Admin-Key': adminKey } });
-      setAdminOK(true); notify('Admin verified.');
-    } catch (error) { setAdminOK(false); notify(error.message); }
-  }
-  async function uploadMaterial(event) {
-    event.preventDefault();
-    if (!adminOK) return;
-    setUploadBusy(true);
-    const form = event.currentTarget;
-    const data = new FormData(form);
-    if (!data.get('file')?.size) data.delete('file');
-    try {
-      await api('/api/library', { method: 'POST', headers: { 'X-Admin-Key': adminKey }, body: data });
-      notify('Material published successfully.');
-      form.reset(); setVideoPreview(false);
-      await refreshLibrary();
-    } catch (error) { notify(`Upload failed: ${error.message}`); }
-    finally { setUploadBusy(false); }
-  }
-  async function removeMaterial(item) {
-    if (!adminOK || !window.confirm(`Delete "${item.title}"?`)) return;
-    try {
-      await api(`/api/library/${encodeURIComponent(item.id)}`, { method: 'DELETE', headers: { 'X-Admin-Key': adminKey } });
-      notify('Material deleted.'); await refreshLibrary();
-    } catch (error) { notify(error.message); }
+      const res = await api('/api/translate', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({
+          text: item.content,
+          target_lang: chatLanguage === 'auto' ? 'English' : (LANG_MAP[chatLanguage] || chatLanguage)
+        })
+      });
+      setMessages(prev => prev.map((m, i) =>
+        i === index ? { ...m, translated: res.translation || 'Translation unavailable.' } : m
+      ));
+    } catch (err) {
+      notify('Translation failed: ' + err.message);
+    } finally {
+      setTranslating(prev => ({ ...prev, [index]: false }));
+    }
   }
 
+  // Library Handlers
+  async function refreshLibrary() {
+    setLibBusy(true);
+    try {
+      const data = await api('/api/library');
+      if (Array.isArray(data)) setLibrary(data);
+    } catch (err) { notify('Failed to fetch library.'); }
+    finally { setLibBusy(false); }
+  }
+
+  async function uploadMaterial(e) {
+    e.preventDefault();
+    if (!adminOK) return;
+    const data = new FormData(e.currentTarget);
+    try {
+      await api('/api/library', { method: 'POST', headers: { 'X-Admin-Key': adminKey }, body: data });
+      notify('Material published!');
+      e.currentTarget.reset();
+      refreshLibrary();
+    } catch (err) { notify(err.message); }
+  }
+
+  // Roadmap Generator
+  async function generateFuguRoadmap() {
+    if (!roadmapGoal.trim()) return notify('Enter a career goal first.');
+    setRoadmapBusy(true);
+    try {
+      const prompt = `Create a 4-week structured study roadmap for a student aspiring to be a ${roadmapGoal}. Give specific weekly tasks and project goals.`;
+      const res = await api('/api/chat', { token, method: 'POST', body: JSON.stringify({ message: prompt, lang: language, profile }) });
+      setLearningState(prev => ({
+        ...prev,
+        fuguRoadmap: { goal: roadmapGoal, advice: res.reply || res.answer, generatedAt: new Date().toLocaleDateString() }
+      }));
+      notify('Roadmap generated by Fugu AI!');
+    } catch (err) { notify(err.message); }
+    finally { setRoadmapBusy(false); }
+  }
+
+  // Mock Interview Handlers
+  function advanceMock() {
+    const all = [...mockAnswers, mockAnswer.trim()];
+    if (mockIndex + 1 < QUESTIONS[mockKind].length) {
+      setMockAnswers(all); setMockAnswer(''); setMockIndex(mockIndex + 1); setTimeLeft(90);
+    } else {
+      const session = { id: Date.now(), kind: mockKind, date: new Date().toLocaleDateString(), count: all.filter(Boolean).length };
+      setMockHistory(prev => [session, ...prev]);
+      setMockRunning(false);
+      notify('Interview completed!');
+    }
+  }
+
+  function resultSkillList(value) {
+    if (Array.isArray(value)) return value.map(String);
+    if (value && typeof value === 'object') return Object.keys(value);
+    return [];
+  }
 
   async function analyzeCareerSkills() {
     if (!careerSelected.length) {
       setCareerError('Select at least one skill before analyzing.');
       return;
     }
+
     setCareerBusy(true);
     setCareerError('');
     setCareerResult(null);
     setCareerAdvice('');
     setCareerAdviceError('');
     careerAdviceRequest.current += 1;
+
     try {
       const result = await api('/api/career/recommend', {
         method: 'POST',
         body: JSON.stringify({ skills: careerSelected })
       });
-      if (!result.recommended_career) throw new Error('Career ML returned no recommendation.');
+
+      if (!result.recommended_career) {
+        throw new Error('Career ML returned no recommendation.');
+      }
+
       setCareerResult(result);
       setRoadmapGoal(result.recommended_career);
-      // Career ML chooses the career; Fugu adds personalized guidance via Ollama.
       void requestCareerAdvice(result, careerSelected);
     } catch (err) {
       setCareerError(err.message);
@@ -435,565 +452,774 @@ export default function App() {
     setCareerAdviceBusy(true);
     setCareerAdviceError('');
     setCareerAdvice('');
+
     const matched = resultSkillList(result.matched_skills).join(', ') || 'none';
     const missing = resultSkillList(result.missing_skills).join(', ') || 'none';
+
     const prompt = [
-      'You are Fugu, an AI Bharat Mentor career coach. Give personalized, practical learning advice in simple Hinglish or easy English.',
-      `Student goal: ${safeText(profile.goal).slice(0,70)}.`,
-      `Selected skills: ${skills.slice(0,22).join(', ')}.`,
-      `Career ML recommendation: ${safeText(result.recommended_career).slice(0,80)}.`,
-      `Matched skills: ${matched.slice(0,170)}. Missing skills: ${missing.slice(0,170)}.`,
-      `Model skill overlap: ${Number(result.skill_match_percentage || 0).toFixed(1)}% (only if ML has been run). This is NOT job probability.`,
-      'Give: (1) 3 skills to learn in order, (2) a 4-week plan, (3) one free practice project. Be specific and brief.'
-    ].join('\n').slice(0,950);
-    try {
-      const response = await api('/api/chat', {
-        token,
-        method: 'POST',
-        body: JSON.stringify({ message: prompt, lang: language, history: [], profile, session_id: getBrowserId(sessionStorage, 'abm_ai_session_id') })
-      });
-      const feedback = safeText(response.reply || response.answer);
-      if (!feedback) throw new Error('Fugu returned an empty response.');
-      if (requestId === careerAdviceRequest.current) setCareerAdvice(feedback);
-    } catch (error) {
-      if (requestId === careerAdviceRequest.current) setCareerAdviceError(error.message);
-    } finally {
-      if (requestId === careerAdviceRequest.current) setCareerAdviceBusy(false);
-    }
-  }
-
-  // The API can serialize skill lists as JSON arrays, or dictionary keys.
-  function resultSkillList(value) {
-    if (Array.isArray(value)) return value.map(String);
-    if (value && typeof value === 'object') return Object.keys(value);
-    return [];
-  }
-
-
-  // A useful checklist is available even if Ollama is offline; Fugu adds the guidance text.
-  function makeWeeklyTasks(goal, missingSkills) {
-    const missing = missingSkills.slice(0, 4);
-    const topics = [
-      missing[0] || `${goal} foundations`,
-      missing[1] || `${goal} core concepts`,
-      missing[2] || `${goal} project development`,
-      missing[3] || `${goal} practical tools`
-    ];
-    return [
-      { id: 'w1a', week: 1, title: `Start ${topics[0]}`, detail: 'Learn fundamentals from the Study Library and write short notes.' },
-      { id: 'w1b', week: 1, title: `Practice ${topics[0]}`, detail: 'Solve 5 small exercises and check your understanding.' },
-      { id: 'w2a', week: 2, title: `Learn ${topics[1]}`, detail: 'Follow one free tutorial and make a small example.' },
-      { id: 'w2b', week: 2, title: 'Build a mini project', detail: `Apply ${topics[0]} and ${topics[1]} in one hands-on task.` },
-      { id: 'w3a', week: 3, title: `Improve ${topics[2]}`, detail: 'Work on a real-world use case and practice debugging.' },
-      { id: 'w3b', week: 3, title: 'Review your skill gaps', detail: 'Return to Skill Analysis and compare your progress.' },
-      { id: 'w4a', week: 4, title: `Create ${goal} portfolio project`, detail: `Use ${topics[3]} if relevant; document what you built.` },
-      { id: 'w4b', week: 4, title: 'Publish and prepare interviews', detail: 'Write a README, update your resume and practice a mock interview.' }
-    ];
-  }
-
-  async function generateFuguRoadmap() {
-    const goal = safeText(roadmapGoal).slice(0, 85);
-    if (!goal) { setRoadmapError('Enter a career goal first.'); return; }
-    const currentSkills = (careerSelected.length ? careerSelected : (profile.skills || []))
-      .filter(Boolean).map(String).slice(0, 20);
-    const matchesCareer = careerResult?.recommended_career?.toLowerCase() === goal.toLowerCase();
-    const missing = matchesCareer ? resultSkillList(careerResult.missing_skills) : [];
-    const hours = Math.max(1, Math.min(6, Number(roadmapHours) || 2));
-    const id = `roadmap-${Date.now()}`;
-    const tasks = makeWeeklyTasks(goal, missing);
-    setRoadmapError('');
-    setRoadmapBusy(true);
-    ++roadmapRequest.current;
-    const currentRequest = roadmapRequest.current;
-    // Generating again intentionally starts a fresh checklist; preserve previous until button click.
-    setLearningState(prev => ({
-      ...prev,
-      fuguRoadmap: { id, goal, hours, source: matchesCareer ? 'Career ML + Fugu' : 'Career goal + Fugu',
-        generatedAt: new Date().toLocaleDateString(), tasks, completed: [], advice: '' }
-    }));
-    const prompt = [
-      'Act as Fugu, friendly AI Bharat Mentor. Make a realistic personalized 4-week study roadmap.',
-      `Career goal: ${goal}. Study time: ${hours} hour(s) per day.`,
-      `Current skills: ${currentSkills.join(', ') || 'beginner'}.`,
-      `Career ML missing skills: ${missing.join(', ').slice(0,150) || 'not assessed'}.`,
-      'Write Week 1-4 headings. For EACH week include 2 practical actions, free learning topics and one measurable outcome.',
-      'Finish with one portfolio project. Be concise in Hinglish or simple English; no paid tools.'
+      'You are Fugu, an AI career coach. Give practical advice in simple English or Hinglish.',
+      `Student goal: ${String(profile.goal || '').slice(0, 70)}.`,
+      `Selected skills: ${skills.slice(0, 22).join(', ')}.`,
+      `Recommended career: ${result.recommended_career}.`,
+      `Matched skills: ${matched}. Missing skills: ${missing}.`,
+      `Skill overlap: ${Number(result.skill_match_percentage || 0).toFixed(1)}%.`,
+      'Give 3 skills to learn in order, a 4-week plan, and one free practice project.'
     ].join('\n').slice(0, 950);
-    try {
-      const reply = await api('/api/chat', {
-        token, method: 'POST',
-        body: JSON.stringify({ message: prompt, lang: language, history: [], profile, session_id: getBrowserId(sessionStorage, 'abm_ai_session_id') })
-      });
-      const advice = safeText(reply.reply || reply.answer);
-      if (!advice) throw new Error('Fugu returned an empty roadmap.');
-      if (currentRequest === roadmapRequest.current) {
-        setLearningState(prev => prev.fuguRoadmap?.id === id
-          ? { ...prev, fuguRoadmap: { ...prev.fuguRoadmap, advice } } : prev);
-        notify('Fugu roadmap generated and saved.');
-      }
-    } catch (error) {
-      if (currentRequest === roadmapRequest.current) setRoadmapError(
-        `Weekly checklist saved, but Fugu AI could not respond: ${error.message}. Log in and check Ollama.`);
-    } finally {
-      if (currentRequest === roadmapRequest.current) setRoadmapBusy(false);
-    }
-  }
 
-  function toggleRoadmapTask(taskId) {
-    setLearningState(prev => {
-      const plan = prev.fuguRoadmap;
-      if (!plan) return prev;
-      const completed = Array.isArray(plan.completed) ? plan.completed : [];
-      return { ...prev, fuguRoadmap: { ...plan,
-        completed: completed.includes(taskId)
-          ? completed.filter(id => id !== taskId) : [...completed, taskId] } };
-    });
-  }
-
-  function startMock(kind) {
-    setMockKind(kind);
-    setMockIndex(0);
-    setMockAnswers([]);
-    setMockAnswer('');
-    setTimeLeft(90);
-    setMockRunning(true);
-  }
-
-  async function requestMockFeedback(session) {
-    if (!session.items?.some(item => item.answer)) return;
-    setMockReviewingId(session.id);
-    // Use excerpts so the request stays within Flask's MAX_MSG=1000 limit.
-    const answers = session.items.map((item, index) =>
-      `Q${index + 1}: ${item.question.slice(0, 75)}\nA${index + 1}: ${(item.answer || '(no answer)').slice(0, 125)}`
-    ).join('\n');
-    const prompt = [
-      `Act as Fugu AI interview coach. Review ONLY these ${session.kind} interview answer excerpts.`,
-      answers,
-      'Give 2 strengths, 2 improvements, and a better example answer to one question.',
-      'If answers are incomplete, say so. This is practice feedback, not a verified interview grade.',
-      'Keep it brief and student-friendly.'
-    ].join('\n').slice(0,950);
     try {
       const response = await api('/api/chat', {
         token,
-        method: 'POST',
-        body: JSON.stringify({ message: prompt, lang: language, history: [], profile, session_id: getBrowserId(sessionStorage, 'abm_ai_session_id') })
-      });
-      const feedback = safeText(response.reply || response.answer);
-      if (!feedback) throw new Error('Fugu returned an empty review.');
-      setMockHistory(prev => prev.map(item => item.id === session.id
-        ? { ...item, fuguFeedback: feedback, fuguError: '' } : item));
-    } catch (error) {
-      setMockHistory(prev => prev.map(item => item.id === session.id
-        ? { ...item, fuguError: error.message } : item));
-    } finally {
-      setMockReviewingId(null);
-    }
-  }
-
-  function advanceMock() {
-    const all = [...mockAnswers, mockAnswer.trim()];
-    const next = mockIndex + 1;
-    if (next < QUESTIONS[mockKind].length) {
-      setMockAnswers(all);
-      setMockAnswer('');
-      setMockIndex(next);
-      setTimeLeft(90);
-    } else {
-      const session = {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        kind: mockKind,
-        date: new Date().toLocaleDateString(),
-        answered: all.filter(Boolean).length,
-        total: all.length,
-        items: QUESTIONS[mockKind].map((question, index) => ({ question, answer: all[index] || '' })),
-        fuguFeedback: '',
-        fuguError: ''
-      };
-      setMockHistory(prev => [session, ...prev].slice(0, 25));
-      setMockRunning(false);
-      if (session.answered) {
-        notify('Interview complete! Fugu is preparing feedback...');
-        void requestMockFeedback(session);
-      } else {
-        notify('Interview finished. Answer at least one question to get AI feedback.');
-      }
-    }
-  }
-
-  const filteredResources = library.filter(item =>
-    (type === 'all' || item.kind === type) &&
-    [item.title, item.skill, item.description].join(' ').toLowerCase().includes(search.trim().toLowerCase())
-  );
-
-
-  async function submitFeedback(e) {
-    e.preventDefault();
-    setFeedbackBusy(true);
-    setFeedbackSuccess('');
-
-    try {
-      const result = await api('/api/feedback', {
         method: 'POST',
         body: JSON.stringify({
-          name: feedbackName,
-          rating: Number(feedbackRating),
-          category: feedbackCategory,
-          message: feedbackMessage
+          message: prompt,
+          lang: language,
+          history: [],
+          profile
         })
       });
 
-      setFeedbackSuccess(result.message || 'Thank you for your feedback!');
-      setFeedbackName('');
-      setFeedbackMessage('');
-      setFeedbackRating(5);
-      setFeedbackCategory('Overall Experience');
-    } catch (error) {
-      notify(error.message || 'Feedback submit nahi ho paya.');
+      const advice = String(response.reply || response.answer || '').trim();
+      if (!advice) throw new Error('Fugu returned an empty response.');
+
+      if (requestId === careerAdviceRequest.current) {
+        setCareerAdvice(advice);
+      }
+    } catch (err) {
+      if (requestId === careerAdviceRequest.current) {
+        setCareerAdviceError(err.message);
+      }
     } finally {
-      setFeedbackBusy(false);
+      if (requestId === careerAdviceRequest.current) {
+        setCareerAdviceBusy(false);
+      }
     }
   }
 
-  function content() {
+  /* ---------------- Page Router Render ---------------- */
+  const renderContent = () => {
     switch (page) {
-      case 'dashboard': return <>
-        <SectionHeading eyebrow="Your workspace" title={`Welcome, ${userName}! 👋`} subtitle="Build skills, explore opportunities and grow with Fugu AI." />
-        <div className="stats">
-          <div className="panel"><span className="muted">Career Goal</span><h3>{profile.goal || 'Explore careers'}</h3><button className="text-link" onClick={() => navigate('roadmap')}>View roadmap →</button></div>
-          <div className="panel"><span className="muted">Roadmap Completed</span>
-            <h3>{aiRoadmap ? `${aiCompleted.length} / ${aiRoadmap.tasks.length} AI steps` : `${done.length} / ${ROADMAP.length}`}</h3>
-            <div className="meter"><div style={{ width: `${aiRoadmap ? aiPercent : percent}%` }} /></div>
-            <button className="text-link" onClick={() => navigate('roadmap')}>Open Fugu Roadmap →</button></div>
-          <div className="panel"><span className="muted">Study Materials</span><h3>Videos · PDFs · Notes</h3><button className="text-link" onClick={() => navigate('library')}>Open Study Library →</button></div>
-        </div>
-        <h3 className="block-title">Quick actions</h3>
-        <div className="quick-grid">{[['🤖', 'Ask Fugu', 'chat'], ['📚', 'Study Library', 'library'], ['🧭', 'Career Roadmap', 'roadmap'], ['📄', 'Build Resume', 'resume'], ['🎤', 'Mock Interview', 'mock'], ['👤', 'Founder', 'founder']].map(x => <button key={x[2]} onClick={() => navigate(x[2])} className="panel quick"><span>{x[0]}</span>{x[1]} <span className="arrow">↗</span></button>)}</div>
-        <div className="panel feature-banner"><span className="emoji">🐡</span><div><h3>Meet Fugu, your AI learning companion</h3><p>Ask for a roadmap, interview practice or help with coding.</p></div><button className="btn" onClick={() => navigate('chat')}>Open AI Chat</button></div>
-      </>;
-      case 'roadmap': return <>
-        <SectionHeading eyebrow="Career ML + Fugu AI" title="🧭 My AI Career Roadmap"
-          subtitle="Choose a career goal, get a personalized 4-week Fugu plan, and track each week." />
-        <div className="panel roadmap-generator">
-          <div className="split-heading"><div><h3>🐡 Generate my learning roadmap</h3>
-            <p className="muted small">Career ML suggestions are used when you analyze skills first.</p></div>
-            <button className="btn subtle" onClick={() => navigate('skills')}>🧠 Analyze Skills →</button></div>
-          <div className="two-fields">
-            <label>Career goal
-              <input aria-label="Roadmap career goal" maxLength={85} value={roadmapGoal}
-                placeholder="AI Developer, Web Developer..." onChange={e => setRoadmapGoal(e.target.value)} />
-            </label>
-            <label>Study time per day
-              <select aria-label="Study hours per day" value={roadmapHours}
-                onChange={e => setRoadmapHours(Number(e.target.value))}>
-                {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n} hour{n !== 1 ? 's' : ''} / day</option>)}
-              </select>
-            </label>
-          </div>
-          {careerResult?.recommended_career && <p className="muted small">ML recommended: <strong>{careerResult.recommended_career}</strong>
-            {' · '}Missing: {resultSkillList(careerResult.missing_skills).join(', ') || 'none listed'}</p>}
-          <button type="button" className="btn" onClick={generateFuguRoadmap} disabled={roadmapBusy || !roadmapGoal.trim()}>
-            {roadmapBusy ? '🐡 Fugu is creating your roadmap…' : aiRoadmap ? '↻ Regenerate with Fugu' : '🐡 Generate with Fugu AI'}
-          </button>
-          {aiRoadmap && <p className="muted small">Regenerating starts a new checklist. Current plan is saved locally and, when signed in, in your account.</p>}
-          {roadmapError && <p className="error-msg" role="alert">{roadmapError}</p>}
-        </div>
-        {aiRoadmap && <div className="panel roadmap-plan">
-          <div className="split-heading"><div><span className="eyebrow">{aiRoadmap.source || 'Fugu Study Plan'}</span>
-            <h3 style={{marginTop:8}}>🎯 {aiRoadmap.goal}</h3>
-            <p className="muted small">4 weeks · {aiRoadmap.hours} hour(s)/day · Created {aiRoadmap.generatedAt}</p></div>
-            <strong>{aiPercent}% complete</strong></div>
-          <div className="meter" role="progressbar" aria-label="Fugu roadmap progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={aiPercent}>
-            <div style={{ width: `${aiPercent}%` }} /></div>
-          <div className="roadmap-weeks">
-            {[1,2,3,4].map(week => <div className="roadmap-week" key={week}>
-              <h4>Week {week}</h4>
-              {aiRoadmap.tasks.filter(task => task.week === week).map(task => <label className="roadmap-ai-task" key={task.id}>
-                <input type="checkbox" checked={aiCompleted.includes(task.id)} onChange={() => toggleRoadmapTask(task.id)} />
-                <span><strong>{task.title}</strong><small>{task.detail}</small></span>
-              </label>)}
-            </div>)}
-          </div>
-          <div className="resource-actions" style={{marginTop:16}}>
-            <button className="btn subtle" onClick={() => navigate('library')}>📚 Open Study Library →</button>
-            <button className="btn subtle" onClick={() => navigate('mock')}>🎤 Practice Mock Interview →</button>
-          </div>
-          <div className="fugu-review"><h3>🐡 Fugu AI personalized guidance</h3>
-            {roadmapBusy && <p className="muted">Waiting for Fugu response…</p>}
-            {aiRoadmap.advice ? <p className="ai-feedback">{aiRoadmap.advice}</p>
-              : <p className="muted">Weekly checklist is ready. Generate while signed in and Ollama is running to get Fugu's detailed advice.</p>}
-          </div>
-        </div>}
-        <div className="panel">
-          <div className="split-heading"><h3>📋 General programming milestones</h3><strong>{percent}% complete</strong></div>
-          <p className="muted small">Your original 10-step roadmap is preserved below.</p>
-          <div className="meter"><div style={{ width: `${percent}%` }} /></div>
-          <div className="roadmap-list" style={{marginTop:16}}>{ROADMAP.map(([title, detail], index) => <label className="panel task" key={title}>
-            <input type="checkbox" checked={done.includes(index + 1)} onChange={e => setDone(prev => e.target.checked ? [...prev, index + 1] : prev.filter(id => id !== index + 1))} />
-            <span className="task-number">{String(index + 1).padStart(2, '0')}</span><span><strong>{title}</strong><small className="muted">{detail}</small></span>
-          </label>)}</div>
-        </div>
-      </>;
-      case 'library': return <>
-        <div className="split-heading"><SectionHeading eyebrow="Curated by AI Bharat Mentor" title="📚 Study Library" subtitle="Watch tutorial videos, read notes and learn from your own saved resources." /><button className="btn subtle" onClick={refreshLibrary}>{libBusy ? 'Refreshing…' : 'Refresh'}</button></div>
-        <div className="filters panel"><input aria-label="Search resources" placeholder="Search videos, topics, notes..." value={search} onChange={e => setSearch(e.target.value)} />
-          <select aria-label="Filter material type" value={type} onChange={e => setType(e.target.value)}><option value="all">All materials</option><option value="video">Videos</option><option value="document">PDFs & Notes</option><option value="link">Links</option><option value="image">Images</option></select></div>
-        {libError && <p className="error-msg">{libError}</p>}
-        {!libError && (libBusy ? <p className="muted">Loading materials...</p> : <div className="resource-grid">{filteredResources.length ? filteredResources.map(item => <Resource key={item.id} item={item} canDelete={adminOK} onDelete={removeMaterial} />) : <p className="muted">No materials found. The admin can upload the first resource below.</p>}</div>)}
-        <div className="panel admin"><div className="split-heading"><div><h3>🔐 Founder Admin</h3><p className="muted">Only people with your private ADMIN_KEY can publish or delete materials.</p></div><button className="btn subtle" onClick={() => { setAdminOpen(!adminOpen); setAdminKey(''); setAdminOK(false); }}> {adminOpen ? 'Close' : 'Admin Controls'} </button></div>
-          {adminOpen && <>{!adminOK ? <form className="inline-form" onSubmit={verifyAdmin}><input required type="password" placeholder="Private admin key" autoComplete="off" value={adminKey} onChange={e => setAdminKey(e.target.value)} /><button className="btn" type="submit">Verify</button></form> : <>
-            <p className="good-msg">Admin access verified for this page.</p>
-            <form className="upload-form" onSubmit={uploadMaterial}>
-              <div className="two-fields"><label>Title<input name="title" required maxLength={200} placeholder="Python for beginners" /></label><label>Skill / Topic<input name="skill" maxLength={80} placeholder="Python" /></label></div>
-              <div className="two-fields"><label>Type<select name="kind" defaultValue="video" onChange={e => setVideoPreview(e.target.value !== 'video' && e.target.value !== 'link')}><option value="video">Video</option><option value="document">PDF / Notes</option><option value="link">Website link</option><option value="image">Image</option></select></label><label>Estimated hours<input name="hours" type="number" min="0.1" max="500" step="0.1" defaultValue="1" /></label></div>
-              <label>Description<textarea name="description" maxLength={500} placeholder="What will students learn?" /></label>
-              <label>Video or website URL<input type="url" name="url" placeholder="https://youtube.com/watch?v=..." /></label>
-              <label>File (PDF / image / MP4)<input type="file" name="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.md,.png,.jpg,.jpeg,.webp,.mp4,.webm" /></label>
-              <p className="muted small">For YouTube, paste the original watch URL. Some creators disable embedded playback; students can still use Watch / open.</p>
-              <button className="btn" disabled={uploadBusy}>{uploadBusy ? 'Uploading...' : 'Publish Material'}</button>
-            </form></> }</>}
-        </div>
-      </>;
-      case 'chat': return <>
-        <SectionHeading eyebrow="Powered by your local Ollama model" title="🐡 Fugu AI Mentor" subtitle="Ask questions about programming, careers, roadmaps, resumes and interviews." />
-        <div className="panel chat-panel"><div className="messages" aria-live="polite">{messages.map((m, index) => <div className={`bubble ${m.role === 'user' ? 'mine' : 'fugu'}`} key={index}>{m.role === 'assistant' && <span className="speaker">🐡 Fugu</span>}{m.content}</div>)}{chatBusy && <div className="bubble fugu">Fugu is thinking...</div>}</div>
-          <div className="prompts">{['Beginner Python roadmap', 'BCA internship preparation', 'Explain Flask APIs'].map(q => <button key={q} onClick={() => setChatInput(q)}>{q}</button>)}</div>
-          <form className="chat-form" onSubmit={sendMessage}><input aria-label="Message Fugu" placeholder="Ask Fugu anything..." value={chatInput} onChange={e => setChatInput(e.target.value)} /><button className="btn" type="submit" disabled={chatBusy || !chatInput.trim()}>Send ➤</button></form>
-        </div>
-      </>;
-      case 'skills': return <>
-        <SectionHeading eyebrow="Your trained Career ML model" title="🧠 AI Skill Gap Analysis" subtitle="Choose your programming skills, then get a career recommendation and a list of skills to learn." />
-        <div className="panel">
-          <div className="split-heading">
-            <div><h3>Select your skills</h3><p className="muted small">{careerSelected.length} skills selected · {careerCatalog.length} available</p></div>
-            <button className="btn subtle" type="button" disabled={!careerCatalog.length}
-              onClick={() => { setCareerSelected((profile.skills || []).filter(s => careerCatalog.includes(s))); setCareerResult(null); setCareerAdvice(''); setCareerAdviceError(''); careerAdviceRequest.current += 1; setCareerError(''); }}>
-              Use My Profile Skills
-            </button>
-          </div>
-          <input className="career-search" type="search" aria-label="Search available skills"
-            placeholder="Search Python, SQL, React, Machine Learning..." value={careerSearch}
-            onChange={e => setCareerSearch(e.target.value)} />
-          {careerCatalogBusy && <p className="muted">Loading Career ML skills...</p>}
-          <div className="career-chip-grid" aria-label="Select your skills">
-            {careerCatalog.filter(skill => skill.toLowerCase().includes(careerSearch.toLowerCase().trim())).map(skill => (
-              <button key={skill} type="button" className={`career-chip ${careerSelected.includes(skill) ? 'selected' : ''}`}
-                aria-pressed={careerSelected.includes(skill)}
-                onClick={() => { setCareerSelected(prev => prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill]); setCareerResult(null); setCareerAdvice(''); setCareerAdviceError(''); careerAdviceRequest.current += 1; setCareerError(''); }}>
-                {careerSelected.includes(skill) ? '✓ ' : '+ '}{skill}
-              </button>
-            ))}
-          </div>
-          <div className="resource-actions" style={{ marginTop: 18 }}>
-            <button type="button" className="btn" disabled={careerBusy || !careerSelected.length || !careerCatalog.length}
-              onClick={analyzeCareerSkills}>{careerBusy ? 'Analyzing…' : '🧠 Analyze My Skills'}</button>
-            <button type="button" className="btn subtle" onClick={() => { setCareerSelected([]); setCareerResult(null); setCareerAdvice(''); setCareerAdviceError(''); careerAdviceRequest.current += 1; setCareerError(''); }}>Clear Selection</button>
-          </div>
-          {careerError && <p className="error-msg" role="alert" style={{ marginTop: 12 }}>{careerError}</p>}
-        </div>
-        {!careerResult && <div className="panel" aria-live="polite">
-          <h3>🐡 Ask Fugu about my skills</h3>
-          <p className="muted small">Fugu advice works through your existing /api/chat, even when Career ML is unavailable.</p>
-          <button type="button" className="btn" disabled={careerAdviceBusy || !careerSelected.length}
-            onClick={() => requestCareerAdvice({
-              recommended_career: roadmapGoal || profile.goal || 'Software Developer',
-              matched_skills: careerSelected, missing_skills: [], skill_match_percentage: 0
-            }, careerSelected)}>
-            {careerAdviceBusy ? '🐡 Fugu is thinking…' : '🐡 Get skill advice from Fugu'}
-          </button>
-          {!careerSelected.length && <p className="muted small">Pehle upar skills select karo.</p>}
-          {careerAdviceError && <p className="error-msg" role="alert">{careerAdviceError}</p>}
-          {careerAdvice && <p className="ai-feedback" style={{whiteSpace:'pre-wrap', marginTop:14}}>{careerAdvice}</p>}
-        </div>}
-        {careerResult && <div className="panel" aria-live="polite">
-          <span className="eyebrow">Career ML result</span>
-          <h2 style={{ marginTop: 8 }}>🎯 {careerResult.recommended_career}</h2>
-          <p className="muted small">Model recommendation based on selected skills; this is not a hiring probability.</p>
-          <div className="split-heading" style={{ marginTop: 16 }}>
-            <strong>Required skill match</strong>
-            <strong>{Number(careerResult.skill_match_percentage || 0).toFixed(1)}%</strong>
-          </div>
-          <div className="meter" role="progressbar" aria-label="Skill match" aria-valuemin={0} aria-valuemax={100}
-            aria-valuenow={Number(careerResult.skill_match_percentage || 0)}>
-            <div style={{ width: `${Math.max(0, Math.min(100, Number(careerResult.skill_match_percentage || 0)))}%` }} />
-          </div>
-          <h3 style={{ marginTop: 18 }}>✅ Matched skills</h3>
-          <div className="tags">{resultSkillList(careerResult.matched_skills).length
-            ? resultSkillList(careerResult.matched_skills).map(s => <Tag key={s}>{s}</Tag>)
-            : <p className="muted">No required skills matched yet.</p>}</div>
-          <h3 style={{ marginTop: 18 }}>📘 Skills to learn next</h3>
-          <div className="tags">{resultSkillList(careerResult.missing_skills).length
-            ? resultSkillList(careerResult.missing_skills).map(s => <Tag key={s}>{s}</Tag>)
-            : <p className="muted">No missing skills from the model's current list.</p>}</div>
-          <div className="resource-actions" style={{ marginTop: 16 }}>
-            <button className="btn subtle" type="button" onClick={() => navigate('library')}>📚 Open Study Library →</button>
-            <button className="btn" type="button" onClick={() => { setRoadmapGoal(careerResult.recommended_career); navigate('roadmap'); }}>
-              🧭 Make Career Roadmap with Fugu →
-            </button>
-          </div>
-          <div className="fugu-review" style={{ marginTop: 18 }} aria-live="polite">
-            <div className="split-heading">
-              <h3>🐡 Fugu AI — Your learning plan</h3>
-              <button type="button" className="btn subtle" disabled={careerAdviceBusy}
-                onClick={() => requestCareerAdvice(careerResult, careerSelected)}>
-                {careerAdviceBusy ? 'Thinking…' : '↻ Ask Fugu again'}
-              </button>
-            </div>
-            {careerAdviceBusy && <p className="muted">Fugu is preparing a personalized roadmap...</p>}
-            {careerAdviceError && <p className="error-msg" role="alert">Fugu could not answer: {careerAdviceError}. Check Ollama / login.</p>}
-            {careerAdvice && <p className="ai-feedback">{careerAdvice}</p>}
-          </div>
-        </div>}
-      </>;
-      case 'progress': return <>
-        <SectionHeading eyebrow="Keep going" title="My Learning Progress" subtitle="Your roadmap tasks and mock interview history." />
-        <div className="stats"><div className="panel"><span className="muted">Completed tasks</span><h3>{done.length}</h3></div><div className="panel"><span className="muted">Overall completion</span><h3>{percent}% general · {aiRoadmap ? `${aiPercent}% Fugu plan` : 'No Fugu plan yet'}</h3></div><div className="panel"><span className="muted">Mock interview sessions</span><h3>{mockHistory.length}</h3></div></div>
-        {aiRoadmap && <div className="panel"><h3>🐡 Fugu Roadmap · {aiRoadmap.goal}</h3>
-          <p className="muted">{aiCompleted.length} of {aiRoadmap.tasks.length} personalized weekly tasks completed.</p>
-          <button className="btn subtle" onClick={() => navigate('roadmap')}>Continue AI Roadmap →</button>
-        </div>}
-        <div className="panel"><h3>Completed milestones</h3>{done.length ? done.slice().sort((a,b) => a-b).map(id => <p key={id} className="muted">✓ {ROADMAP[id - 1]?.[0]}</p>) : <p className="muted">No completed tasks yet.</p>}</div>
-      </>;
-      case 'resume': return <>
-        <SectionHeading eyebrow="Career tools" title="Resume Builder" subtitle="Edit your resume and print or save it as PDF using your browser." />
-        <div className="resume-layout"><div className="panel form-fields">
-          {[["Full Name", 'name'], ["Role / Title", 'title'], ["Education", 'education'], ["Skills (comma separated)", 'skills']].map(([label, field]) => <label key={field}>{label}<input value={resume[field] || ''} onChange={e => setResume(r => ({ ...r, [field]: e.target.value }))} /></label>)}
-          {[["Professional Summary", 'summary'], ["Projects & Achievements", 'projects']].map(([label, field]) => <label key={field}>{label}<textarea value={resume[field] || ''} onChange={e => setResume(r => ({ ...r, [field]: e.target.value }))} /></label>)}
-          <button className="btn" onClick={() => window.print()}>🖨 Print / Save as PDF</button>
-        </div><div id="resume-preview" className="paper"><h1>{resume.name || profile.full || 'Your Name'}</h1><p>{resume.title}</p><hr /><h3>Profile</h3><p>{resume.summary}</p><h3>Education</h3><p>{resume.education}</p><h3>Skills</h3><p>{resume.skills}</p><h3>Projects</h3><p className="prewrap">{resume.projects}</p></div></div>
-      </>;
-      case 'mock': return <>
-        <SectionHeading eyebrow="Get interview-ready" title="🐡 Fugu AI Mock Interview"
-          subtitle="Practice written answers with 90 seconds per question. After you finish, Fugu AI reviews your answers and suggests improvements." />
-        {!mockRunning ? <>
-          <div className="panel">
-            <h3>Select interview type</h3>
-            <div className="tags">{Object.keys(QUESTIONS).map(kind =>
-              <button key={kind} className={`btn ${kind === mockKind ? '' : 'subtle'}`}
-                onClick={() => setMockKind(kind)}>{kind}</button>)}</div>
-            <p className="muted">{QUESTIONS[mockKind].length} questions · 90 seconds each · Fugu feedback after submission</p>
-            <button className="btn" onClick={() => startMock(mockKind)}>Start AI Mock Test →</button>
-          </div>
-          <div className="panel" aria-live="polite">
-            <h3>Recent mock tests & Fugu feedback</h3>
-            {!mockHistory.length && <p className="muted">No sessions yet. Start your first mock test!</p>}
-            {mockHistory.slice(0, 8).map((session, index) => <div className="fugu-review" key={session.id || index}>
-              <div className="split-heading">
-                <div><strong>{session.kind || session.c || 'Mock'} · {session.date || session.d || ''}</strong>
-                  <p className="muted small">{session.answered ?? '?'} / {session.total ?? '?'} questions answered</p>
-                </div>
-                {session.items?.some(x => x.answer) && <button type="button" className="btn subtle"
-                  disabled={Boolean(mockReviewingId)} onClick={() => requestMockFeedback(session)}>
-                  {mockReviewingId === session.id ? 'Fugu reviewing…' : session.fuguFeedback ? '↻ Review again' : '🐡 Get Fugu review'}
-                </button>}
+      case 'dashboard':
+        return (
+          <>
+            <div className="sp">
+              <div>
+                <h2>Welcome back, {account?.name || profile.name || 'Learner'}! ??</h2>
+                <p className="muted">Track your career goal and learning steps with Fugu AI.</p>
               </div>
-              {mockReviewingId === session.id && <p className="muted">Fugu is checking your answers using Ollama...</p>}
-              {session.fuguError && <p className="error-msg" role="alert">Review failed: {session.fuguError}. Check Ollama / login, then retry.</p>}
-              {session.fuguFeedback && <p className="ai-feedback">{session.fuguFeedback}</p>}
-              {!session.fuguFeedback && !session.fuguError && mockReviewingId !== session.id &&
-                <p className="muted small">{session.answered ? 'Select Get Fugu review to see feedback.' : 'No submitted answers to review.'}</p>}
-            </div>)}
-          </div>
-        </> : <div className="panel">
-          <div className="split-heading">
-            <strong>{mockKind} · Question {mockIndex + 1}/{QUESTIONS[mockKind].length}</strong>
-            <Tag>⏱ {timeLeft}s</Tag>
-          </div>
-          <h3 className="interview-question">{QUESTIONS[mockKind][mockIndex]}</h3>
-          <textarea rows={6} value={mockAnswer} onChange={e => setMockAnswer(e.target.value)}
-            placeholder="Write your own answer. Fugu will review it when the test finishes." />
-          <div className="resource-actions">
-            <button className="btn" onClick={advanceMock}>{mockIndex === QUESTIONS[mockKind].length - 1 ? 'Finish & Ask Fugu →' : 'Next question →'}</button>
-            <button className="btn subtle" onClick={() => setMockRunning(false)}>Quit</button>
-          </div>
-        </div>}
-      </>;
-      case 'profile': return <>
-        <SectionHeading eyebrow="Personalize your experience" title="My Profile" subtitle="Your profile helps Fugu personalize its responses." />
-        <div className="panel form-fields profile-form"><div className="two-fields">{[["Full name", 'full'], ["Education", 'edu'], ["Career goal", 'goal'], ["City", 'city']].map(([label, field]) => <label key={field}>{label}<input value={profile[field] || ''} onChange={e => setProfile(p => ({ ...p, [field]: e.target.value, ...(field === 'full' ? { name: e.target.value.trim().split(' ')[0] || '' } : {}) }))} /></label>)}</div>
-          <label>Skills (comma separated)<input value={(profile.skills || []).join(', ')} onChange={e => setProfile(p => ({ ...p, skills: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))} /></label>
-          <p className="muted small">Changes save automatically in this browser. When logged in, they also sync to your Flask /api/state.</p>
-          {account && <button className="btn subtle" onClick={logout}>Log out</button>}
-        </div>
-      </>;
-      case 'feedback': return <>
-        <SectionHeading eyebrow="Your voice matters" title="Share Your Feedback"
-          subtitle="Help us make AI Bharat Mentor better for every student." />
-        <form className="panel feedback-form" onSubmit={submitFeedback}>
-          <h3>How was your experience?</h3>
-          <p className="muted small">Select your rating</p>
-          <div className="feedback-stars" role="group" aria-label="Rating">
-            {[1, 2, 3, 4, 5].map(star => (
-              <button key={star} type="button"
-                className={star <= feedbackRating ? 'selected' : ''}
-                aria-label={`${star} star${star > 1 ? 's' : ''}`}
-                aria-pressed={feedbackRating === star}
-                onClick={() => setFeedbackRating(star)}>★</button>
-            ))}
-          </div>
-          <label>Your name (optional)
-            <input value={feedbackName} maxLength={100}
-              placeholder="Your name"
-              onChange={e => setFeedbackName(e.target.value)} />
-          </label>
-          <label>Feedback category
-            <select value={feedbackCategory}
-              onChange={e => setFeedbackCategory(e.target.value)}>
-              <option>Overall Experience</option>
-              <option>AI Mentor</option>
-              <option>Career Roadmap</option>
-              <option>Study Library</option>
-              <option>Resume & Interview</option>
-              <option>Bug Report</option>
-              <option>Feature Suggestion</option>
-            </select>
-          </label>
-          <label>Your feedback
-            <textarea required minLength={5} maxLength={2000} rows={5}
-              value={feedbackMessage}
-              placeholder="Tell us what you liked or what we can improve..."
-              onChange={e => setFeedbackMessage(e.target.value)} />
-          </label>
-          {feedbackSuccess && <p className="feedback-success" role="status">{feedbackSuccess}</p>}
-          <button className="btn" type="submit" disabled={feedbackBusy}>
-            {feedbackBusy ? 'Submitting...' : 'Submit Feedback'}
-          </button>
-          <button className="btn subtle" type="button" onClick={() => navigate('home')}>
-            Back to Home
-          </button>
-        </form>
-      </>;
-      case 'founder': return <Founder />;
-      default: return null;
-    }
-  }
+              <Avatar z={56} />
+            </div>
+            <div className="g3" style={{ marginTop: 16 }}>
+              <div className="panel">
+                <span className="muted">Career Goal</span>
+                <h3 style={{ margin: '6px 0' }}>{profile.goal || 'Software Developer'}</h3>
+                <button className="btn out small" onClick={() => navigate('roadmap')}>View Roadmap ?</button>
+              </div>
+              <div className="panel">
+                <span className="muted">Current Study Goal</span>
+                <h3 style={{ margin: '6px 0' }}>{learningState.fuguRoadmap ? learningState.fuguRoadmap.goal : 'Not Started'}</h3>
+                <button className="btn out small" onClick={() => navigate('roadmap')}>Generate Plan ?</button>
+              </div>
+              <div className="panel">
+                <span className="muted">Mock Interviews</span>
+                <h3 style={{ margin: '6px 0' }}>{mockHistory.length} Completed</h3>
+                <button className="btn out small" onClick={() => navigate('mock')}>Practice ?</button>
+              </div>
+            </div>
+            <h3 style={{ marginTop: 24 }}>Quick Actions</h3>
+            <div className="g3" style={{ marginTop: 10 }}>
+              {[
+                ['', 'Fugu AI Mentor', 'chat'],
+                ['\u{1F4DA}', 'Study Library', 'library'],
+                ['\u{1F5FA}', 'Career Roadmap', 'roadmap'],
+                ['\u{1F4C4}', 'Resume Builder', 'resume'],
+                ['\u{1F3A4}', 'Mock Interview', 'mock'],
+                ['\u{1F4CA}', 'Skill Analysis', 'skills']
+              ].map(item => (
+                <div key={item[2]} className="panel card clickable" onClick={() => navigate(item[2])}>
+                  <span style={{ fontSize: 24 }}>{item[2] === "chat" ? <img src={fuguMascot} alt="Fugu" style={{ width: 38, height: 38, objectFit: "contain", verticalAlign: "middle" }} /> : item[0]}</span>
+                  <b style={{ display: 'block', marginTop: 8 }}>{item[1]}</b>
+                </div>
+              ))}
+            </div>
+          </>
+        );
 
-  return <div className="app">
-    {page === 'home' ? <>
-      <header className="landing-header"><button className="brand" onClick={() => navigate('home')}><span className="brand-mark">✦</span><span>AI Bharat Mentor<small>LEARN · GROW · ACHIEVE</small></span></button><nav><button onClick={() => navigate('founder')}>About Founder</button><button onClick={() => navigate('library')}>Study Library</button><button onClick={() => navigate('login')}>Log in</button><button className="btn" onClick={() => navigate(account ? 'dashboard' : 'login')}>Get Started →</button></nav></header>
-      <main className="landing-main"><div><span className="eyebrow">AI-powered guidance for Indian students</span><h1>Your career.<br /><span className="gradient-text">Your future.</span><br />Powered by AI.</h1><p>Plan your career path, learn practical skills and prepare for interviews with Fugu — your own AI mentor.</p><div className="hero-actions"><button className="btn big" onClick={() => navigate(account ? 'dashboard' : 'login')}>Start Learning →</button><button className="btn subtle big" onClick={() => navigate('founder')}>Meet the Founder</button></div></div><div className="robot-showcase"><div className="halo" /><span className="fugu">🐡</span><div className="floating-chip">🤖 Meet Fugu AI</div><div className="floating-chip second">📚 Learn · Grow · Achieve</div></div></main>
-      <section className="community-stats" aria-label="AI Bharat Mentor community statistics">
-        <div className="community-stat">
-          <strong>{publicStats.registered_users ?? '—'}</strong>
-          <span>Registered Users</span>
+      case 'skills':
+        return (
+          <>
+            <div className="sp">
+              <div>
+                <h2>Skill Analysis</h2>
+                <p className="muted">Select the skills you already know. Fugu will help identify a suitable career path.</p>
+              </div>
+              <span className="chip">{careerSelected.length} selected</span>
+            </div>
+
+            <div className="panel" style={{ marginTop: 14 }}>
+              <h3>Choose Your Skills</h3>
+              {careerLoading ? (
+                <p className="muted">Loading skills...</p>
+              ) : careerSkills.length ? (
+                <div className="g3" style={{ marginTop: 12 }}>
+                  {careerSkills.map(skill => (
+                    <label key={skill} className="panel card" style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={careerSelected.includes(skill)}
+                        onChange={e => {
+                          setCareerSelected(prev =>
+                            e.target.checked
+                              ? [...prev, skill]
+                              : prev.filter(item => item !== skill)
+                          );
+                          setCareerError('');
+                        }}
+                      />
+                      <span>{skill}</span>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <p className="muted">No skills are available right now. Please try again later.</p>
+              )}
+
+              <button
+                className="btn"
+                style={{ marginTop: 16 }}
+                onClick={analyzeCareerSkills}
+                disabled={careerBusy || careerLoading || !careerSelected.length}
+              >
+                {careerBusy ? 'Analyzing...' : 'Analyze My Skills'}
+              </button>
+
+              {careerError && <p className="small" style={{ color: '#ff8b8b', marginTop: 10 }}>{careerError}</p>}
+            </div>
+
+            {careerResult && (
+              <div className="panel" style={{ marginTop: 16 }}>
+                <h3>Your Career Recommendation</h3>
+                <h2 style={{ color: 'var(--cyan)', margin: '10px 0' }}>{careerResult.recommended_career}</h2>
+                <p className="muted">
+                  Skill match: {Number(careerResult.skill_match_percentage || 0).toFixed(1)}%
+                </p>
+                <div className="g2" style={{ marginTop: 12 }}>
+                  <div>
+                    <b>Matched Skills</b>
+                    <p className="muted small">{resultSkillList(careerResult.matched_skills).join(', ') || 'None'}</p>
+                  </div>
+                  <div>
+                    <b>Skills to Improve</b>
+                    <p className="muted small">{resultSkillList(careerResult.missing_skills).join(', ') || 'None'}</p>
+                  </div>
+                </div>
+                <button className="btn out small" onClick={() => navigate('roadmap')} style={{ marginTop: 10 }}>
+                  Create Career Roadmap
+                </button>
+              </div>
+            )}
+
+            {(careerAdviceBusy || careerAdvice || careerAdviceError) && (
+              <div className="panel" style={{ marginTop: 16 }}>
+                <h3>Fugu AI Career Guidance</h3>
+                {careerAdviceBusy && <p className="muted">Fugu is preparing your personalized advice...</p>}
+                {careerAdvice && <div className="ai-box" style={{ whiteSpace: 'pre-wrap', marginTop: 10 }}>{careerAdvice}</div>}
+                {careerAdviceError && <p className="small" style={{ color: '#ff8b8b' }}>{careerAdviceError}</p>}
+              </div>
+            )}
+          </>
+        );
+
+      case 'roadmap':
+        return (
+          <>
+            <h2>?? Career Roadmap Generator</h2>
+            <div className="panel" style={{ marginTop: 14 }}>
+              <label className="muted">Target Career Goal</label>
+              <div className="row" style={{ marginTop: 6, gap: 10 }}>
+                <input className="in2" value={roadmapGoal} onChange={e => setRoadmapGoal(e.target.value)} placeholder="e.g. Software Developer, Data Analyst" />
+                <button className="btn" onClick={generateFuguRoadmap} disabled={roadmapBusy}>
+                  {roadmapBusy ? 'Fugu is thinking...' : 'Generate with Fugu AI ??'}
+                </button>
+              </div>
+            </div>
+            {learningState.fuguRoadmap && (
+              <div className="panel" style={{ marginTop: 16 }}>
+                <h3>?? Fugu AI Study Roadmap: {learningState.fuguRoadmap.goal}</h3>
+                <p className="muted small">Created on {learningState.fuguRoadmap.generatedAt}</p>
+                <div className="ai-box" style={{ marginTop: 12, whiteSpace: 'pre-wrap' }}>
+                  {learningState.fuguRoadmap.advice}
+                </div>
+              </div>
+            )}
+          </>
+        );
+
+      case 'library':
+        return (
+          <>
+            <div className="sp">
+              <h2>?? Study Library</h2>
+              <button className="btn out small" onClick={refreshLibrary}>{libBusy ? 'Refreshing...' : 'Refresh'}</button>
+            </div>
+            <div className="g3" style={{ marginTop: 16 }}>
+              {library.length ? library.map(item => (
+                <ResourceCard key={item.id} item={item} canDelete={adminOK} onDelete={async (i) => {
+                  try {
+                    await api(`/api/library/${encodeURIComponent(i.id)}`, { method: 'DELETE', headers: { 'X-Admin-Key': adminKey } });
+                    refreshLibrary();
+                  } catch (e) { notify(e.message); }
+                }} />
+              )) : <p className="muted">No study materials available yet.</p>}
+            </div>
+
+            <div className="panel" style={{ marginTop: 24 }}>
+              <h3>?? Founder Admin Controls</h3>
+              {!adminOK ? (
+                <div className="row" style={{ marginTop: 10 }}>
+                  <input className="in2" type="password" placeholder="Private Admin Key" value={adminKey} onChange={e => setAdminKey(e.target.value)} />
+                  <button className="btn" onClick={async () => {
+                    try {
+                      await api('/api/library/admin-check', { headers: { 'X-Admin-Key': adminKey } });
+                      setAdminOK(true); notify('Admin verified!');
+                    } catch (e) { notify('Invalid Key'); }
+                  }}>Verify Admin</button>
+                </div>
+              ) : (
+                <form onSubmit={uploadMaterial} style={{ display: 'grid', gap: 10, marginTop: 10 }}>
+                  <input className="in2" name="title" required placeholder="Title" />
+                  <input className="in2" name="skill" placeholder="Skill / Topic" />
+                  <select className="in2" name="kind">
+                    <option value="video">Video</option>
+                    <option value="document">Document / PDF</option>
+                    <option value="link">Link</option>
+                  </select>
+                  <input className="in2" name="url" placeholder="URL (e.g. YouTube Link)" />
+                  <button className="btn" type="submit">Publish Resource</button>
+                </form>
+              )}
+            </div>
+          </>
+        );
+
+      case 'chat':
+        return (
+          <>
+            <div className="sp" style={{ justifyContent: 'flex-start', gap: 12 }}>
+              <Avatar z={48} />
+              <div>
+                <h2>Fugu AI Mentor</h2>
+                <span className="chip">Fugu language</span>
+                <select className="in2" style={{ marginTop: 8, maxWidth: 230 }} value={chatLanguage} onChange={e => setChatLanguage(e.target.value)}>
+                  <option value="auto">Auto Detect</option>
+                  {Object.entries(LANG_MAP).filter(([code]) => code !== "auto").map(([code, name]) => <option key={code} value={code}>{name} ({code})</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="panel chat-box" style={{ marginTop: 14 }}>
+              <div className="messages-list">
+                {messages.map((m, i) => (
+                  <div key={i} className={`msg ${m.role === 'user' ? 'u' : 'b'}`}>
+                    {m.role === 'assistant' && <b>Fugu: </b>}
+                    <span style={{ whiteSpace: 'pre-wrap' }}>{m.content}</span>
+                    <div style={{ marginTop: 6 }}>
+                      <button type="button" className="btn" style={{ padding: "4px 9px", fontSize: 12 }} onClick={() => translateMessage(i)} disabled={!!translating[i]}>{translating[i] ? "Translating..." : "Translate"}</button>
+                    </div>
+                    {m.translated && <div className="panel" style={{ marginTop: 8, padding: 10 }}><b>Translation:</b><div style={{ whiteSpace: "pre-wrap" }}>{m.translated}</div></div>}
+                  </div>
+                ))}
+                {chatBusy && <div className="msg b">Fugu is thinking...</div>}
+              </div>
+              <form className="ci" onSubmit={sendMessage}>
+                <input className="in2" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Ask Fugu anything..." />
+                <button className="btn" type="submit" disabled={chatBusy || !chatInput.trim()}>Send ?</button>
+              </form>
+            </div>
+          </>
+        );
+
+      case 'resume':
+        return (
+          <>
+            <h2>?? Resume Builder</h2>
+            <div className="g2" style={{ marginTop: 14 }}>
+              <div className="panel form-grid">
+                <label className="muted">Full Name</label>
+                <input className="in2" value={resume.name} onChange={e => setResume({ ...resume, name: e.target.value })} />
+                <label className="muted">Title</label>
+                <input className="in2" value={resume.title} onChange={e => setResume({ ...resume, title: e.target.value })} />
+                <label className="muted">Education</label>
+                <input className="in2" value={resume.education} onChange={e => setResume({ ...resume, education: e.target.value })} />
+                <label className="muted">Skills</label>
+                <input className="in2" value={resume.skills} onChange={e => setResume({ ...resume, skills: e.target.value })} />
+                <label className="muted">Summary</label>
+                <textarea className="in2" rows="3" value={resume.summary} onChange={e => setResume({ ...resume, summary: e.target.value })} />
+                <button
+  className="btn"
+  onClick={() => window.print()}
+  style={{ marginTop: 10 }}
+>
+  📄 Print / Save PDF
+</button>
+              </div>
+              <div id="resume-paper" className="paper">
+                <h2>{resume.name || profile.full || 'Your Name'}</h2>
+                <p><i>{resume.title}</i></p>
+                <hr />
+                <h4>Summary</h4><p>{resume.summary}</p>
+                <h4>Education</h4><p>{resume.education}</p>
+                <h4>Skills</h4><p>{resume.skills}</p>
+              </div>
+            </div>
+          </>
+        );
+
+      case 'mock':
+        return (
+          <>
+            <h2>?? Mock Interview</h2>
+            {!mockRunning ? (
+              <div className="panel" style={{ marginTop: 14 }}>
+                <h3>Choose Topic</h3>
+                <div className="row" style={{ gap: 10, margin: '12px 0' }}>
+                  {Object.keys(QUESTIONS).map(k => (
+                    <button key={k} className={`btn ${mockKind === k ? '' : 'out'}`} onClick={() => setMockKind(k)}>{k}</button>
+                  ))}
+                </div>
+                <button className="btn" onClick={() => { setMockIndex(0); setMockAnswers([]); setMockAnswer(''); setTimeLeft(90); setMockRunning(true); }}>Start Practice ?</button>
+              </div>
+            ) : (
+              <div className="panel" style={{ marginTop: 14 }}>
+                <div className="sp">
+                  <b>Question {mockIndex + 1}/{QUESTIONS[mockKind].length}</b>
+                  <span className="chip">? {timeLeft}s</span>
+                </div>
+                <h3 style={{ margin: '16px 0' }}>{QUESTIONS[mockKind][mockIndex]}</h3>
+                <textarea className="in2" rows="5" value={mockAnswer} onChange={e => setMockAnswer(e.target.value)} placeholder="Type your answer here..." />
+                <div className="row" style={{ marginTop: 12, justifyContent: 'space-between' }}>
+                  <button className="btn out" onClick={() => setMockRunning(false)}>Quit</button>
+                  <button className="btn" onClick={advanceMock}>{mockIndex + 1 < QUESTIONS[mockKind].length ? 'Next Question ?' : 'Finish Test'}</button>
+                </div>
+              </div>
+            )}
+          </>
+        );
+
+      case 'founder':
+        return <FounderSection navigate={navigate} />;
+
+      default:
+        return (
+          <div className="panel">
+            <h2>{page.toUpperCase()}</h2>
+            <p className="muted">This feature is fully integrated with your data profile.</p>
+          </div>
+        );
+    }
+  };
+
+  /* ---------------- Main Layout Output ---------------- */
+  return (
+    <>
+      <style>{CSS}</style>
+
+      {page === 'home' ? (
+        <div className="landing-page">
+          <nav className="nav-bar">
+            <div className="brand-title">
+              <Avatar z={32} />
+              <b>AI Bharat Mentor</b>
+            </div>
+            <div className="row" style={{ gap: 16 }}>
+              <button className="btn out small" onClick={() => navigate('founder')}>Founder</button>
+              <button className="btn out small" onClick={() => navigate('login')}>Log In</button>
+              <button className="btn small" onClick={() => navigate(token ? 'dashboard' : 'login')}>Get Started ?</button>
+            </div>
+          </nav>
+
+          <header className="hero-section landing-hero">
+  <div className="landing-copy">
+    <span className="pill">âœ¦ AI-Powered Success Mentor</span>
+    <h1>Your Future<br /><em className="cy-text">Starts Here.</em></h1>
+    <p className="sub">
+      Discover your strengths. Build real skills. Prepare for your dream career.
+      Your personal AI-powered companion for learning, growth and success.
+    </p>
+    <div className="row landing-actions">
+      <button className="btn lav" onClick={() => navigate(token ? 'dashboard' : 'login')}>
+        Start Learning Free â†’
+      </button>
+      <button className="btn out" onClick={() => navigate('founder')}>
+        Meet the Founder
+      </button>
+    </div>
+    <div className="hero-trust">
+      <span>âœ¦ Learn</span>
+      <span>âœ¦ Improve</span>
+      <span>âœ¦ Prepare</span>
+      <span>âœ¦ Grow</span>
+    </div>
+  </div>
+  <div className="landing-visual">
+    <div className="fugu-glow"></div>
+    <div className="fugu-orbit orbit-one"></div>
+    <div className="fugu-orbit orbit-two"></div>
+    <div className="fugu-mascot">
+      <Fish size={260} />
+    </div>
+    <span className="float-tag tag-top">âœ¦ Your AI Companion</span>
+    <span className="float-tag tag-bottom">ðŸš€ Build Your Future</span>
+  </div>
+</header>
+
+<section className="module-section">
+  <div className="module-heading">
+    <span className="pill">YOUR GROWTH JOURNEY</span>
+    <h2>Explore Your <em className="cy-text">Learning Modules</em></h2>
+    <p>Everything you need to learn, prepare and move closer to your dream career.</p>
+  </div>
+
+  <div className="module-grid">
+    <button type="button" className="module-card" onClick={() => navigate('chat')}>
+      <span className="module-icon purple-icon">ðŸ¤–</span>
+      <b>Fugu AI Mentor</b>
+      <span>Get personal guidance and instant learning support.</span>
+      <small>Explore Mentor â†’</small>
+    </button>
+
+    <button type="button" className="module-card" onClick={() => navigate('roadmap')}>
+      <span className="module-icon blue-icon">ðŸ§­</span>
+      <b>Career Roadmap</b>
+      <span>Discover your career path with a step-by-step plan.</span>
+      <small>Build Your Roadmap â†’</small>
+    </button>
+
+    <button type="button" className="module-card" onClick={() => navigate('skills')}>
+      <span className="module-icon cyan-icon">ðŸ“Š</span>
+      <b>Skill Analysis</b>
+      <span>Understand your strengths and skills to improve.</span>
+      <small>Analyze Skills â†’</small>
+    </button>
+
+    <button type="button" className="module-card" onClick={() => navigate('library')}>
+      <span className="module-icon blue-icon">ðŸ“š</span>
+      <b>Study Library</b>
+      <span>Explore learning resources and study materials.</span>
+      <small>Start Learning â†’</small>
+    </button>
+
+    <button type="button" className="module-card" onClick={() => navigate('resume')}>
+      <span className="module-icon purple-icon">ðŸ“„</span>
+      <b>Resume Builder</b>
+      <span>Create a professional resume for opportunities.</span>
+      <small>Create Resume â†’</small>
+    </button>
+
+    <button type="button" className="module-card" onClick={() => navigate('mock')}>
+      <span className="module-icon cyan-icon">ðŸŽ¤</span>
+      <b>Mock Interview</b>
+      <span>Practice interviews and build your confidence.</span>
+      <small>Practice Now â†’</small>
+    </button>
+
+    <button type="button" className="module-card" onClick={() => navigate('progress')}>
+      <span className="module-icon blue-icon">ðŸ“ˆ</span>
+      <b>Progress Tracker</b>
+      <span>Track your learning journey and achievements.</span>
+      <small>View Progress â†’</small>
+    </button>
+  </div>
+</section>
+          <FounderSection navigate={navigate} />
         </div>
-        <div className="community-stat">
-          <strong>{publicStats.total_visitors ?? '—'}</strong>
-          <span>Total Visitors</span>
+      ) : page === 'login' ? (
+        <div className="split-auth">
+          <div className="auth-left">
+            <div className="brand-title"><Avatar z={36} /> <b>AI Bharat Mentor</b></div>
+            <div className="auth-hero-box">
+              <h1>Learn Today.<br /><em className="cy-text">Lead Tomorrow.</em></h1>
+              <p className="sub">Sign in to sync your roadmaps, skill tracking, and AI mentor chat.</p>
+              <Fish size={180} />
+            </div>
+          </div>
+          <div className="auth-right">
+            <button className="back-btn" onClick={() => navigate('home')}>? Back to Home</button>
+            <form className="auth-box panel" onSubmit={handleAuth}>
+              <h2>{authMode === 'login' ? 'Welcome Back' : 'Create Account'}</h2>
+              {authMode === 'signup' && (
+                <>
+                  <label className="muted">Full Name</label>
+                  <input className="in2" required value={authForm.name} onChange={e => setAuthForm({ ...authForm, name: e.target.value })} />
+                </>
+              )}
+              <label className="muted">Email Address</label>
+              <input className="in2" type="email" required value={authForm.email} onChange={e => setAuthForm({ ...authForm, email: e.target.value })} />
+              <label className="muted">Password</label>
+              <input className="in2" type="password" required value={authForm.password} onChange={e => setAuthForm({ ...authForm, password: e.target.value })} />
+              <button className="btn lav" type="submit" disabled={authBusy} style={{ marginTop: 10 }}>
+                {authBusy ? 'Please wait...' : authMode === 'login' ? 'Log In' : 'Sign Up'}
+              </button>
+              <p className="muted small" style={{ textAlign: 'center', marginTop: 10 }}>
+                {authMode === 'login' ? "Don't have an account? " : "Already registered? "}
+                <a style={{ color: '#22d3ee' }} onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}>
+                  {authMode === 'login' ? 'Sign Up' : 'Log In'}
+                </a>
+              </p>
+            </form>
+          </div>
         </div>
-        <div className="community-stat">
-          <strong>{publicStats.ai_sessions ?? '—'}</strong>
-          <span>AI Sessions</span>
+      ) : (
+        <div className="app-shell">
+          <aside className="sidebar">
+            <div className="brand-title" onClick={() => navigate('home')} style={{ cursor: 'pointer' }}>
+              <Avatar z={32} />
+              <div>
+                <b>AI Bharat Mentor</b>
+                <small style={{ fontSize: 9, display: 'block', color: '#9fb0d6' }}>LEARN Ã‚Â· GROW Ã‚Â· ACHIEVE</small>
+              </div>
+            </div>
+            <nav className="side-nav">
+              {MENU.map(n => (
+                <a key={n[1]} className={page === n[1] ? 'on' : ''} onClick={() => navigate(n[1])}>
+                  <span>{n[1] === "chat" ? <img src={fuguMascot} alt="Fugu" style={{ width: 25, height: 25, objectFit: "contain", verticalAlign: "middle" }} /> : n[0]}</span> {n[2]}
+                </a>
+              ))}
+            </nav>
+          </aside>
+          <main className="main-content">
+            <header className="top-bar">
+              <span className="muted">Workspace / {MENU.find(m => m[1] === page)?.[2] || 'Page'}</span>
+              <div className="row" style={{ gap: 12 }}>
+                <select value={language} onChange={e => setLanguage(e.target.value)}>
+                  {Object.entries(LANG_MAP).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
+                <div className="user-badge" onClick={() => navigate('profile')}>
+                  {(account?.name || profile.name || 'S')[0].toUpperCase()}
+                </div>
+              </div>
+            </header>
+            <div className="page-body">{renderContent()}</div>
+          </main>
         </div>
-      </section>
-      <div className="feature-strip"><span>🧭 Career Roadmaps</span><span>🤖 AI Mentor</span><span>📚 Study Library</span><span>📄 Resume & Interview Tools</span></div>
-      <section className="feedback-invite">
-        <h2>💬 Help us improve AI Bharat Mentor</h2>
-        <p>Your feedback helps us build a better learning experience for students.</p>
-        <button className="btn" onClick={() => navigate('feedback')}>Give Feedback →</button>
-      </section>
-      <div className="landing-founder"><Founder /></div>
-    </> : page === 'login' ? <main className="auth-shell"><button className="back" onClick={() => navigate('home')}>← Back to Home</button><div className="auth-layout"><div className="auth-intro"><span className="eyebrow">AI Bharat Mentor</span><h1>Learn today.<br /><span className="gradient-text">Lead tomorrow.</span></h1><span className="fugu">🐡</span></div><form className="panel auth-form" onSubmit={authenticate}><h2>{authMode === 'signup' ? 'Create your account' : 'Welcome back'}</h2><p className="muted">Continue your journey toward your goals.</p>{authMode === 'signup' && <label>Full Name<input required minLength={2} autoComplete="name" value={authForm.name} onChange={e => setAuthForm(v => ({ ...v, name: e.target.value }))} /></label>}<label>Email<input type="email" required autoComplete="email" value={authForm.email} onChange={e => setAuthForm(v => ({ ...v, email: e.target.value }))} /></label><label>Password<input type="password" required minLength={6} autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'} value={authForm.password} onChange={e => setAuthForm(v => ({ ...v, password: e.target.value }))} /></label><button className="btn wide" disabled={authBusy}>{authBusy ? 'Please wait...' : authMode === 'signup' ? 'Sign up' : 'Log in'}</button><p className="muted small">{authMode === 'login' ? 'New here?' : 'Already registered?'} <button type="button" className="text-link" onClick={() => setAuthMode(m => m === 'login' ? 'signup' : 'login')}>{authMode === 'login' ? 'Create an account' : 'Log in instead'}</button></p></form></div></main> : <div className="workspace"><aside className="sidebar"><button className="brand" onClick={() => navigate('home')}><span className="brand-mark">✦</span><span>AI Bharat Mentor<small>LEARN · GROW · ACHIEVE</small></span></button><nav className="side-nav" aria-label="App sections">{MENU.map(([icon, key, label]) => <button key={key} className={page === key ? 'active' : ''} onClick={() => navigate(key)}><span className="nav-icon">{icon}</span>{label}</button>)}</nav><div className="sidebar-bottom"><span className="server-dot" />{serverStatus}</div></aside><main className="workspace-main"><header className="workspace-header"><div className="breadcrumb">AI Bharat Mentor <span> / {MENU.find(x => x[1] === page)?.[2] || 'Dashboard'}</span></div><div className="header-right"><select aria-label="AI language" value={language} onChange={e => setLanguage(e.target.value)}><option value="en">English</option><option value="hi">हिन्दी</option><option value="zh">中文</option></select><button className="avatar" onClick={() => navigate('profile')} title="Profile">{userName[0]?.toUpperCase() || 'P'}</button></div></header><div className="page-content">{content()}</div></main></div>}
-    {alert && <div role="alert" className="toast"><span>{alert}</span><button aria-label="Dismiss notification" onClick={() => setAlert('')}>×</button></div>}
-  </div>;
+      )}
+
+      {toast && <div className="toast-popup">{toast}</div>}
+    </>
+  );
 }
+
+/* ---------------- Integrated Stylesheet ---------------- */
+const CSS = `
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+:root { --bg:#060f2b; --panel:#0d1a40; --p:#7C4DFF; --cy:#22d3ee; --lav:#a5a8f5; --t2:#9fb0d6; --line:#ffffff22; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter', sans-serif; background:var(--bg); color:#fff; min-height:100vh; }
+a { color:inherit; text-decoration:none; cursor:pointer; }
+.btn { border:0; border-radius:9px; padding:10px 18px; font:600 13px Inter; cursor:pointer; color:#fff; background:var(--p); display:inline-block; text-align:center; }
+.btn.lav { background:var(--lav); color:#060f2b; }
+.btn.out { background:transparent; border:1px solid #ffffff33; }
+.btn.small { padding:6px 12px; font-size:12px; }
+.btn.danger { background:#ef4444; }
+.in2 { width:100%; background:#122354; border:1px solid var(--line); border-radius:8px; padding:10px; color:#fff; font:13px Inter; outline:0; }
+.in2:focus { border-color:var(--cy); }
+select.in2, select { background:#122354; color:#fff; border:1px solid var(--line); border-radius:8px; padding:8px; font:12px Inter; }
+.fish-float { animation: fl 4s ease-in-out infinite; filter: drop-shadow(0 0 25px #3b82f6aa); }
+@keyframes fl { 50% { transform: translateY(-10px); } }
+.avatar-fugu { border-radius:50%; background:#102256; border:2px solid var(--cy); display:grid; place-items:center; overflow:hidden; }
+.sp { display:flex; justify-content:space-between; align-items:center; }
+.row { display:flex; align-items:center; }
+.g2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.g3 { display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; }
+.panel { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px; }
+.panel.card.clickable { cursor:pointer; transition:transform 0.2s; }
+.panel.card.clickable:hover { transform:translateY(-3px); border-color:var(--cy); }
+.muted { color:var(--t2); font-size:13px; }
+.small { font-size:12px; }
+.chip { display:inline-block; padding:3px 9px; border-radius:6px; background:#ffffff15; font-size:11px; }
+.pill { border:1px solid var(--cy); color:var(--cy); font-size:11px; padding:5px 12px; border-radius:20px; font-weight:600; }
+.cy-text { color:var(--cy); font-style:normal; }
+.landing-page { min-height:100vh; background:radial-gradient(ellipse at 50% 20%, #173780 0%, var(--bg) 70%); }
+.nav-bar { display:flex; justify-content:space-between; align-items:center; padding:18px 6vw; }
+.brand-title { display:flex; align-items:center; gap:10px; font-size:15px; }
+.hero-section { text-align:center; padding:60px 4vw 40px; }
+.hero-section h1 { font-size:clamp(36px, 5vw, 60px); margin:18px 0; line-height:1.1; }
+.sub { max-width:480px; margin:0 auto 24px; color:var(--t2); font-size:15px; }
+.split-auth { display:grid; grid-template-columns:1fr 1fr; min-height:100vh; }
+.auth-left { background:radial-gradient(circle at 30% 50%, #1e459c, #07133b); padding:40px; display:flex; flex-direction:column; justify-content:space-between; }
+.auth-right { background:var(--bg); padding:40px; display:flex; flex-direction:column; justify-content:center; position:relative; }
+.auth-box { width:100%; max-width:360px; margin:0 auto; display:grid; gap:12px; }
+.back-btn { position:absolute; top:24px; left:24px; background:none; border:0; color:var(--t2); cursor:pointer; font-size:13px; }
+.app-shell { display:grid; grid-template-columns:240px 1fr; min-height:100vh; }
+.sidebar { background:#040a1f; border-right:1px solid var(--line); padding:20px 14px; }
+.side-nav { margin-top:24px; display:grid; gap:4px; }
+.side-nav a { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; font-size:13px; color:var(--t2); }
+.side-nav a.on, .side-nav a:hover { background:var(--p); color:#fff; }
+.main-content { display:flex; flex-direction:column; }
+.top-bar { padding:16px 24px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; }
+.user-badge { width:32px; height:32px; border-radius:50%; background:var(--p); display:grid; place-items:center; font-weight:700; cursor:pointer; }
+.page-body { padding:24px; flex:1; }
+.chat-box { height:480px; display:flex; flex-direction:column; }
+.messages-list { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding-right:6px; }
+.msg { padding:10px 14px; border-radius:10px; font-size:13px; max-width:80%; line-height:1.4; }
+.msg.u { background:var(--p); margin-left:auto; }
+.msg.b { background:#122554; }
+.ci { display:flex; gap:8px; margin-top:12px; }
+.paper { background:#fff; color:#111; padding:24px; border-radius:8px; font-size:13px; line-height:1.6; }
+.video-wrap iframe { width:100%; height:200px; border:0; border-radius:8px; }
+.toast-popup { position:fixed; bottom:20px; right:20px; background:var(--p); color:#fff; padding:12px 20px; border-radius:8px; font-size:13px; z-index:99; box-shadow:0 4px 12px #000; }
+.founder-wrap { display:grid; grid-template-columns:220px 1fr; gap:24px; background:linear-gradient(135deg, #0d1a40, #131038); border:1px solid var(--p); border-radius:18px; padding:28px; margin:40px 6vw; align-items:center; }
+.founder-img-col { display:grid; place-items:center; }
+.founder-kicker { color:var(--cy); font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; }
+.founder-name { font-size:28px; margin:6px 0; }
+.founder-copy { font-size:13px; color:#c8d5f2; line-height:1.6; margin-bottom:8px; }
+.founder-chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:12px; }
+.founder-chips span { border:1px solid var(--p); background:#7C4DFF22; border-radius:20px; padding:4px 10px; font-size:11px; }
+/* ===== AI Bharat Mentor New Landing Design ===== */
+.landing-page {
+  background:
+    radial-gradient(ellipse at 78% 22%, #172b67 0%, transparent 38%),
+    radial-gradient(ellipse at 15% 5%, #21134d 0%, transparent 38%),
+    #070b1e;
+  overflow: hidden;
+}
+.landing-hero {
+  max-width: 1240px;
+  margin: 0 auto;
+  min-height: 490px;
+  padding: 65px 6vw 55px;
+  display: grid;
+  grid-template-columns: 1.05fr .95fr;
+  align-items: center;
+  gap: 35px;
+  text-align: left;
+}
+.landing-copy { position: relative; z-index: 2; }
+.landing-copy h1 {
+  font-size: clamp(42px, 5.5vw, 70px);
+  line-height: 1.06;
+  letter-spacing: -2px;
+  margin: 22px 0;
+  color: #f6f7ff;
+}
+.landing-copy .sub {
+  max-width: 510px;
+  margin: 0 0 27px;
+  line-height: 1.8;
+  font-size: 15px;
+}
+.landing-actions { justify-content: flex-start; gap: 13px; flex-wrap: wrap; }
+.hero-trust { display:flex; gap:20px; flex-wrap:wrap; margin-top:30px; color:#aebde8; font-size:12px; }
+.hero-trust span { color:#9eaff0; }
+.landing-visual {
+  min-height: 340px;
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+.fugu-glow {
+  position:absolute;
+  width:280px;
+  height:280px;
+  border-radius:50%;
+  background:radial-gradient(circle,#4c43c7 0%,#263c91 35%,transparent 72%);
+  filter:blur(18px);
+  opacity:.8;
+}
+.fugu-mascot { position:relative; z-index:2; animation:fl 4s ease-in-out infinite; filter:drop-shadow(0 0 25px #6555ff66); }
+.fugu-orbit {
+  position:absolute;
+  width:330px;
+  height:170px;
+  border:1px solid #8294ff44;
+  border-radius:50%;
+  transform:rotate(-22deg);
+}
+.orbit-two { transform:rotate(35deg); width:290px; height:210px; border-color:#38d6e844; }
+.float-tag {
+  position:absolute;
+  z-index:3;
+  padding:10px 14px;
+  border:1px solid #6579d966;
+  background:#101c42dd;
+  border-radius:12px;
+  color:#e5eaff;
+  font-size:11px;
+  box-shadow:0 8px 30px #0005;
+}
+.tag-top { top:35px; right:0; }
+.tag-bottom { bottom:35px; left:0; }
+.module-section {
+  max-width:1240px;
+  margin:0 auto;
+  padding:48px 6vw 65px;
+}
+.module-heading { text-align:center; margin-bottom:32px; }
+.module-heading h2 { font-size:clamp(25px,3vw,36px); margin:15px 0 9px; }
+.module-heading p { color:var(--t2); font-size:13px; line-height:1.7; }
+.module-grid {
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:16px;
+}
+.module-card {
+  min-width:0;
+  text-align:left;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:11px;
+  padding:21px;
+  min-height:190px;
+  color:#f4f6ff;
+  background:linear-gradient(145deg,#111d40,#0c1430);
+  border:1px solid #34447788;
+  border-radius:16px;
+  cursor:pointer;
+  font-family:inherit;
+  transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease;
+}
+.module-card:hover {
+  transform:translateY(-5px);
+  border-color:#8b69ff;
+  box-shadow:0 12px 35px #6d4cff22;
+}
+.module-card b { font-size:15px; }
+.module-card > span:not(.module-icon) { color:#aebbdc; font-size:12px; line-height:1.6; }
+.module-card small { color:#67d9f0; font-size:11px; font-weight:700; margin-top:auto; }
+.module-icon {
+  width:43px;
+  height:43px;
+  border-radius:12px;
+  display:grid;
+  place-items:center;
+  font-size:21px;
+  background:#8055ff22;
+}
+.blue-icon { background:#397bff25; }
+.cyan-icon { background:#25c6d925; }
+.module-card:nth-child(5) { grid-column:2; }
+
+@media(max-width:900px) {
+  .module-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .module-card:nth-child(5) { grid-column:auto; }
+}
+@media(max-width:800px) {
+  .landing-hero { grid-template-columns:1fr; text-align:center; padding-top:45px; }
+  .landing-copy .sub { margin-left:auto; margin-right:auto; }
+  .landing-actions { justify-content:center; }
+  .hero-trust { justify-content:center; }
+  .landing-visual { min-height:280px; }
+  .fugu-mascot :is(svg) { max-width:210px; }
+  .module-section { padding-top:30px; }
+}
+@media(max-width:480px) {
+  .module-grid { grid-template-columns:1fr; }
+  .module-card { min-height:160px; }
+  .landing-copy h1 { letter-spacing:-1px; }
+  .float-tag { font-size:10px; }
+}
+/* ===== End New Landing Design ===== */
+@media(max-width:800px) {
+  .app-shell, .split-auth, .g2, .g3, .founder-wrap { grid-template-columns:1fr !important; }
+  .sidebar { display:none; }
+}
+`;
