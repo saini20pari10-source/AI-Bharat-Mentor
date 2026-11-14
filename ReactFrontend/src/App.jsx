@@ -40,7 +40,7 @@ const FALLBACK_SKILLS = [
   'Power BI', 'Excel', 'Git', 'GitHub'
 ];
 const KEY = 'abm_react_v1';
-const API_BASE = ['localhost', '127.0.0.1'].includes(window.location.hostname) ? 'http://127.0.0.1:5001' : 'https://ai-bharat-mentor-1.onrender.com';
+const API_BASE = ['localhost', '127.0.0.1'].includes(window.location.hostname) ? 'http://127.0.0.1:5000' : 'https://ai-bharat-mentor-1.onrender.com';
 const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
 const safeText = value => String(value ?? '').trim();
 const imagePath = `${import.meta.env.BASE_URL}founder.jpg`;
