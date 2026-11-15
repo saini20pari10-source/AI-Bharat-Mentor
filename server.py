@@ -618,7 +618,12 @@ OLLAMA_MODEL = os.getenv(
 
 
 
-USE_BRAIN = os.getenv("USE_BRAIN", "0") == "1" and brain is not None
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b").strip()
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+# Disable fixed knowledge-base answers in the live chat.
+USE_BRAIN = False
 
 
 
@@ -717,83 +722,79 @@ def clean_history(history):
 
 
 def ask(message, history=None, profile=None, lang="en"):
-
-    """Jawab deta hai: {"reply": "...", "provider": "brain" | "ollama"}.
-
-    Ollama na chale to AIUnavailable uthata hai."""
-
+    """Groq online AI first; local Ollama is the fallback."""
     message = str(message).strip()[:MAX_MSG]
-
     history = clean_history(history)
-
     profile = profile if isinstance(profile, dict) else {}
-
     lang = lang if lang in LANGN else "en"
 
+    messages = [
+        {"role": "system", "content": build_prompt(profile, lang)},
+        *history,
+        {"role": "user", "content": message},
+    ]
 
+    groq_error = None
 
-    if USE_BRAIN:                                    # pehle apna Fugu Brain (tez), na mile to Ollama
+    # 1. Hosted website: use Groq when an API key is configured.
+    if GROQ_API_KEY:
+        try:
+            response = requests.post(
+                GROQ_URL,
+                headers={
+                    "Authorization": f"Bearer {GROQ_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": GROQ_MODEL,
+                    "messages": messages,
+                    "stream": False,
+                },
+                timeout=(10, 60),
+            )
+            response.raise_for_status()
+            result = response.json()
+            reply = (result["choices"][0]["message"]["content"] or "").strip()
+            if not reply:
+                raise ValueError("Groq returned an empty reply")
+            return {"reply": reply, "provider": "groq"}
+        except (
+            requests.exceptions.RequestException,
+            KeyError,
+            IndexError,
+            ValueError,
+            TypeError,
+        ) as e:
+            groq_error = e
+            app.logger.warning("Groq request failed; trying Ollama fallback: %s", e)
 
-        prev = next((m["content"] for m in reversed(history) if m["role"] == "user"), None)
-
-        ctx = {"name": clean(profile.get("name")), "goal": clean(profile.get("goal")),
-
-               "edu": clean(profile.get("edu")), "lang": lang, "prev": prev}
-
-        o = brain.answer(message, ctx)
-
-        if o:
-
-            return {"reply": o["text"], "provider": "brain"}
-
-
-
+    # 2. Local development: use Ollama if it is running.
     try:
-
         response = requests.post(
-
             f"{OLLAMA_URL}/api/chat",
-
             json={
-
                 "model": OLLAMA_MODEL,
-
-                "messages": [
-
-                    {"role": "system", "content": build_prompt(profile, lang)},
-
-                    *history,
-
-                    {"role": "user", "content": message},
-
-                ],
-
+                "messages": messages,
                 "stream": False,
-
             },
-
             timeout=(5, 180),
-
         )
-
         response.raise_for_status()
-
         result = response.json()
-
         reply = (result["message"]["content"] or "").strip()
-
         if not reply:
-
-            raise ValueError("empty reply")
-
+            raise ValueError("Ollama returned an empty reply")
         return {"reply": reply, "provider": "ollama"}
-
-    except (requests.exceptions.RequestException, KeyError, ValueError, TypeError) as e:
-
-        raise AIUnavailable(OLLAMA_DOWN_MSG) from e
-
-
-
+    except (
+        requests.exceptions.RequestException,
+        KeyError,
+        ValueError,
+        TypeError,
+    ) as e:
+        app.logger.warning("Ollama request failed: %s", e)
+        raise AIUnavailable(
+            "Fugu AI abhi connect nahi ho pa raha. Please thodi der baad try karo."
+        ) from (groq_error or e)
 
 
 def ollama_status():
@@ -828,7 +829,7 @@ def ollama_status():
 
 def health():
 
-    return jsonify({"status": "ok", "service": "AI Bharat Mentor", "brain": USE_BRAIN, "frontend": str(FRONT), "frontend_new": frontend_is_new(), **mysql_status(), **ollama_status()})
+    return jsonify({"status": "ok", "service": "AI Bharat Mentor", "brain": USE_BRAIN, "groq_configured": bool(GROQ_API_KEY), "groq_model": GROQ_MODEL, "frontend": str(FRONT), "frontend_new": frontend_is_new(), **mysql_status(), **ollama_status()})
 
 
 
