@@ -213,6 +213,16 @@ def init_db():
                 created_at BIGINT NOT NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""")
 
+            cur.execute("""CREATE TABLE IF NOT EXISTS visitors (
+                visitor_id VARCHAR(64) PRIMARY KEY,
+                created_at BIGINT NOT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""")
+
+            cur.execute("""CREATE TABLE IF NOT EXISTS ai_sessions (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                created_at BIGINT NOT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""")
+
         print(
             f"🗄️ MySQL connected: "
             f"{MYSQL['host']}:{MYSQL['port']} database={MYSQL_DB}"
@@ -226,6 +236,49 @@ def init_db():
 
 
 
+
+def record_ai_session():
+    """Successful AI response ko database mein count karta hai."""
+    try:
+        with dbc() as conn, conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO ai_sessions (created_at) VALUES (%s)",
+                (int(time.time()),)
+            )
+    except Exception:
+        app.logger.exception("AI session count save nahi ho paya")
+
+
+@app.post("/api/public/visit")
+def public_visit():
+    d = body()
+    visitor_id = str(d.get("visitor_id", "")).strip()
+    if not visitor_id or len(visitor_id) > 64:
+        raise ApiError("Invalid visitor ID")
+
+    with dbc() as conn, conn.cursor() as cur:
+        cur.execute(
+            "INSERT IGNORE INTO visitors (visitor_id, created_at) VALUES (%s, %s)",
+            (visitor_id, int(time.time()))
+        )
+    return jsonify({"ok": True})
+
+
+@app.get("/api/public/stats")
+def public_stats():
+    with dbc() as conn, conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) AS n FROM users")
+        registered_users = cur.fetchone()["n"]
+        cur.execute("SELECT COUNT(*) AS n FROM visitors")
+        total_visitors = cur.fetchone()["n"]
+        cur.execute("SELECT COUNT(*) AS n FROM ai_sessions")
+        ai_sessions = cur.fetchone()["n"]
+
+    return jsonify({
+        "registered_users": registered_users,
+        "total_visitors": total_visitors,
+        "ai_sessions": ai_sessions
+    })
 
 def _json(x, default):
 
@@ -1184,6 +1237,7 @@ def chat():
     try:
 
         out = ask(message, history=history, profile=profile, lang=d.get("lang"))
+        record_ai_session()
 
     except AIUnavailable as e:
 
@@ -1332,6 +1386,7 @@ def ask_route():
     try:
 
         out = ask(message.strip()[:MAX_MSG], history=history, profile=profile, lang=d.get("lang"))
+        record_ai_session()
 
     except AIUnavailable as e:
 
