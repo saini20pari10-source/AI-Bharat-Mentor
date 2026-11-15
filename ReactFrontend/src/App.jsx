@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 // AI Bharat Mentor (ABM) — React frontend for existing Flask server.py
 // Start Flask on :5000 and Vite on :5173. No API keys are hard-coded here.
@@ -761,7 +763,9 @@ export default function App() {
       </>;
       case 'chat': return <>
         <SectionHeading eyebrow="Powered by your local Ollama model" title="🐡 Fugu AI Mentor" subtitle="Ask questions about programming, careers, roadmaps, resumes and interviews." />
-        <div className="panel chat-panel"><div className="messages" aria-live="polite">{messages.map((m, index) => <div className={`bubble ${m.role === 'user' ? 'mine' : 'fugu'}`} key={index}>{m.role === 'assistant' && <span className="speaker">🐡 Fugu</span>}{m.content}</div>)}{chatBusy && <div className="bubble fugu">Fugu is thinking...</div>}</div>
+        <div className="panel chat-panel"><div className="messages" aria-live="polite">{messages.map((m, index) => <div className={`bubble ${m.role === 'user' ? 'mine' : 'fugu'}`} key={index}>{m.role === 'assistant' && <span className="speaker">🐡 Fugu</span>}{m.role === 'assistant'
+            ? <div className="markdown-content"><ReactMarkdown remarkPlugins={[remarkGfm]}>{String(m.content || '')}</ReactMarkdown></div>
+            : m.content}</div>)}{chatBusy && <div className="bubble fugu">Fugu is thinking...</div>}</div>
           <div className="prompts">{['Beginner Python roadmap', 'BCA internship preparation', 'Explain Flask APIs'].map(q => <button key={q} onClick={() => setChatInput(q)}>{q}</button>)}</div>
           <form className="chat-form" onSubmit={sendMessage}><input aria-label="Message Fugu" placeholder="Ask Fugu anything..." value={chatInput} onChange={e => setChatInput(e.target.value)} /><button className="btn" type="submit" disabled={chatBusy || !chatInput.trim()}>Send ➤</button></form>
         </div>
