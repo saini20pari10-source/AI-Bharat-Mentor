@@ -1080,3 +1080,57 @@ label input, label select, label textarea { margin-bottom: 8px; }
   border: 1px solid rgba(255, 255, 255, .18);
   text-align: left;
 }
+
+/* FUGU MARKDOWN FORMAT OVERRIDE FIX */
+.chat-panel .messages .bubble .markdown-content h1,
+.chat-panel .messages .bubble .markdown-content h2,
+.chat-panel .messages .bubble .markdown-content h3,
+.chat-panel .messages .bubble .markdown-content h4 {
+  font-size: 20px !important;
+  font-weight: 800 !important;
+  line-height: 1.4 !important;
+  color: var(--cyan) !important;
+  margin: 14px 0 9px !important;
+}
+
+.chat-panel .messages .bubble .markdown-content strong,
+.chat-panel .messages .bubble .markdown-content b {
+  font-weight: 800 !important;
+  color: #ffffff !important;
+}
+
+.chat-panel .messages .bubble .markdown-content em {
+  font-style: italic !important;
+}
+
+.chat-panel .messages .bubble .markdown-content ul,
+.chat-panel .messages .bubble .markdown-content ol {
+  padding-left: 24px !important;
+  margin: 10px 0 !important;
+}
+
+.chat-panel .messages .bubble .markdown-content li {
+  display: list-item !important;
+  margin: 6px 0 !important;
+}
+
+.chat-panel .messages .bubble .markdown-content p {
+  margin: 9px 0 !important;
+  white-space: normal !important;
+}
+
+.chat-panel .messages .bubble .markdown-content code {
+  font-family: Consolas, monospace !important;
+}
+
+.chat-panel .messages .bubble .markdown-content pre {
+  white-space: pre !important;
+  overflow-x: auto !important;
+}
+
+.chat-panel .messages .bubble .markdown-content table {
+  display: block !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  border-collapse: collapse !important;
+}
