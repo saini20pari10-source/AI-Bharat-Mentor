@@ -157,7 +157,7 @@ export default function App() {
   const [language, setLanguage] = useState('en');
   const [alert, setAlert] = useState('');
   const [authMode, setAuthMode] = useState('login');
-  const [authForm, setAuthForm] = useState({ name: '', email: '', password: '' });
+  const [authForm, setAuthForm] = useState({ name: '', email: '', password: '', currentStudy: '', learningInterest: '' });
   const [authBusy, setAuthBusy] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState([{ role: 'assistant', content: "Hi! I'm Fugu, your AI career mentor. Tell me your goal." }]);
@@ -326,12 +326,17 @@ export default function App() {
       setToken(result.token);
       setAccount(result.user);
       const state = result.state || {};
-      setProfile(state.u || { ...profile, name: result.user.name || authForm.name, full: result.user.name || authForm.name, email: result.user.email });
+      const nextProfile = { ...(state.u || profile), name: result.user.name || authForm.name, full: result.user.name || authForm.name, email: result.user.email };
+      if (signup) {
+        nextProfile.currentStudy = authForm.currentStudy.trim();
+        nextProfile.learningInterest = authForm.learningInterest.trim();
+      }
+      setProfile(nextProfile);
       if (Array.isArray(state.dn)) setDone(state.dn);
       if (state.rs) setResume(state.rs);
       if (Array.isArray(state.mh)) setMockHistory(state.mh);
       cloudReady.current = true;
-      setAuthForm({ name: '', email: '', password: '' });
+      setAuthForm({ name: '', email: '', password: '', currentStudy: '', learningInterest: '' });
       navigate('dashboard');
       notify(signup ? 'Account created successfully.' : 'Welcome back!');
     } catch (error) { notify(error.message); }
@@ -817,6 +822,26 @@ export default function App() {
             aria-valuenow={Number(careerResult.skill_match_percentage || 0)}>
             <div style={{ width: `${Math.max(0, Math.min(100, Number(careerResult.skill_match_percentage || 0)))}%` }} />
           </div>
+          {(() => {
+            const matched = resultSkillList(careerResult.matched_skills);
+            const missing = resultSkillList(careerResult.missing_skills);
+            const total = matched.length + missing.length;
+            const matchedPct = total ? matched.length / total * 100 : 0;
+            return <div className="panel" style={{ marginTop: 18 }}>
+              <h3>Skill Learning Overview</h3>
+              <div className="stats">
+                <div><span className="muted small">Total required</span><h3>{total}</h3></div>
+                <div><span className="muted small">Matched</span><h3>{matched.length}</h3></div>
+                <div><span className="muted small">To learn</span><h3>{missing.length}</h3></div>
+              </div>
+              <div role="img" aria-label={`${matched.length} matched and ${missing.length} skills to learn`}
+                style={{ display: "flex", height: 18, borderRadius: 20, overflow: "hidden", background: "var(--bg)", marginTop: 12 }}>
+                <div style={{ width: `${matchedPct}%`, background: "var(--cyan)" }} />
+                <div style={{ width: `${100 - matchedPct}%`, background: "var(--purple)" }} />
+              </div>
+              <p className="muted small" style={{ marginTop: 10 }}>Selected skills matched: {matched.length} ? Skills still to learn: {missing.length}</p>
+            </div>;
+          })()}
           <h3 style={{ marginTop: 18 }}>✅ Matched skills</h3>
           <div className="tags">{resultSkillList(careerResult.matched_skills).length
             ? resultSkillList(careerResult.matched_skills).map(s => <Tag key={s}>{s}</Tag>)
@@ -847,6 +872,23 @@ export default function App() {
       </>;
       case 'progress': return <>
         <SectionHeading eyebrow="Keep going" title="My Learning Progress" subtitle="Your roadmap tasks and mock interview history." />
+        <div className="panel">
+          <h3>Learning Progress Graph</h3>
+          <div style={{ marginTop: 16 }}>
+            <div className="split-heading"><strong>General roadmap</strong><strong>{percent}%</strong></div>
+            <div className="meter" role="progressbar" aria-label="General roadmap completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
+              <div style={{ width: `${percent}%` }} />
+            </div>
+            <p className="muted small">{done.length} of {ROADMAP.length} milestones completed</p>
+          </div>
+          <div style={{ marginTop: 20 }}>
+            <div className="split-heading"><strong>Fugu personalized roadmap</strong><strong>{aiRoadmap ? `${aiPercent}%` : "Not started"}</strong></div>
+            <div className="meter" role="progressbar" aria-label="Fugu roadmap completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={aiPercent}>
+              <div style={{ width: `${aiPercent}%` }} />
+            </div>
+            <p className="muted small">{aiRoadmap ? `${aiCompleted.filter(id => aiRoadmap.tasks.some(task => task.id === id)).length} of ${aiRoadmap.tasks.length} personalized tasks completed` : "Generate a Fugu roadmap to start tracking personalized tasks."}</p>
+          </div>
+        </div>
         <div className="stats"><div className="panel"><span className="muted">Completed tasks</span><h3>{done.length}</h3></div><div className="panel"><span className="muted">Overall completion</span><h3>{percent}% general · {aiRoadmap ? `${aiPercent}% Fugu plan` : 'No Fugu plan yet'}</h3></div><div className="panel"><span className="muted">Mock interview sessions</span><h3>{mockHistory.length}</h3></div></div>
         {aiRoadmap && <div className="panel"><h3>🐡 Fugu Roadmap · {aiRoadmap.goal}</h3>
           <p className="muted">{aiCompleted.length} of {aiRoadmap.tasks.length} personalized weekly tasks completed.</p>
@@ -912,6 +954,8 @@ export default function App() {
         <SectionHeading eyebrow="Personalize your experience" title="My Profile" subtitle="Your profile helps Fugu personalize its responses." />
         <div className="panel form-fields profile-form"><div className="two-fields">{[["Full name", 'full'], ["Education", 'edu'], ["Career goal", 'goal'], ["City", 'city']].map(([label, field]) => <label key={field}>{label}<input value={profile[field] || ''} onChange={e => setProfile(p => ({ ...p, [field]: e.target.value, ...(field === 'full' ? { name: e.target.value.trim().split(' ')[0] || '' } : {}) }))} /></label>)}</div>
           <label>Skills (comma separated)<input value={(profile.skills || []).join(', ')} onChange={e => setProfile(p => ({ ...p, skills: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))} /></label>
+          <label>Current Study<input value={profile.currentStudy || ''} onChange={e => setProfile(p => ({ ...p, currentStudy: e.target.value }))} /></label>
+          <label>What do you want to learn?<input value={profile.learningInterest || ''} onChange={e => setProfile(p => ({ ...p, learningInterest: e.target.value }))} /></label>
           <p className="muted small">Changes save automatically in this browser. When logged in, they also sync to your Flask /api/state.</p>
           {account && <button className="btn subtle" onClick={logout}>Log out</button>}
         </div>
@@ -993,7 +1037,11 @@ export default function App() {
         <button className="btn" onClick={() => navigate('feedback')}>Give Feedback →</button>
       </section>
       <div className="landing-founder"><Founder /></div>
-    </> : page === 'login' ? <main className="auth-shell"><button className="back" onClick={() => navigate('home')}>← Back to Home</button><div className="auth-layout"><div className="auth-intro"><span className="eyebrow">AI Bharat Mentor</span><h1>Learn today.<br /><span className="gradient-text">Lead tomorrow.</span></h1><span className="fugu">🐡</span></div><form className="panel auth-form" onSubmit={authenticate}><h2>{authMode === 'signup' ? 'Create your account' : 'Welcome back'}</h2><p className="muted">Continue your journey toward your goals.</p>{authMode === 'signup' && <label>Full Name<input required minLength={2} autoComplete="name" value={authForm.name} onChange={e => setAuthForm(v => ({ ...v, name: e.target.value }))} /></label>}<label>Email<input type="email" required autoComplete="email" value={authForm.email} onChange={e => setAuthForm(v => ({ ...v, email: e.target.value }))} /></label><label>Password<input type="password" required minLength={6} autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'} value={authForm.password} onChange={e => setAuthForm(v => ({ ...v, password: e.target.value }))} /></label><button className="btn wide" disabled={authBusy}>{authBusy ? 'Please wait...' : authMode === 'signup' ? 'Sign up' : 'Log in'}</button><p className="muted small">{authMode === 'login' ? 'New here?' : 'Already registered?'} <button type="button" className="text-link" onClick={() => setAuthMode(m => m === 'login' ? 'signup' : 'login')}>{authMode === 'login' ? 'Create an account' : 'Log in instead'}</button></p></form></div></main> : <div className="workspace"><aside className="sidebar"><button className="brand" onClick={() => navigate('home')}><span className="brand-mark">✦</span><span>AI Bharat Mentor<small>LEARN · GROW · ACHIEVE</small></span></button><nav className="side-nav" aria-label="App sections">{MENU.map(([icon, key, label]) => <button key={key} className={page === key ? 'active' : ''} onClick={() => navigate(key)}><span className="nav-icon">{icon}</span>{label}</button>)}</nav><div className="sidebar-bottom"><span className="server-dot" />{serverStatus}</div></aside><main className="workspace-main"><header className="workspace-header"><div className="breadcrumb">AI Bharat Mentor <span> / {MENU.find(x => x[1] === page)?.[2] || 'Dashboard'}</span></div><div className="header-right"><select aria-label="AI language" value={language} onChange={e => setLanguage(e.target.value)}><option value="en">English</option><option value="hi">हिन्दी</option><option value="zh">中文</option></select><button className="avatar" onClick={() => navigate('profile')} title="Profile">{userName[0]?.toUpperCase() || 'P'}</button></div></header><div className="page-content">{content()}</div></main></div>}
+    </> : page === 'login' ? <main className="auth-shell"><button className="back" onClick={() => navigate('home')}>← Back to Home</button><div className="auth-layout"><div className="auth-intro"><span className="eyebrow">AI Bharat Mentor</span><h1>Learn today.<br /><span className="gradient-text">Lead tomorrow.</span></h1><span className="fugu">🐡</span></div><form className="panel auth-form" onSubmit={authenticate}><h2>{authMode === 'signup' ? 'Create your account' : 'Welcome back'}</h2><p className="muted">Continue your journey toward your goals.</p>{authMode === 'signup' && <>
+      <label>Full Name<input required minLength={2} autoComplete="name" value={authForm.name} onChange={e => setAuthForm(v => ({ ...v, name: e.target.value }))} /></label>
+      <label>Current Study<input required placeholder="e.g. BCA, B.Tech, Class 12, BA" value={authForm.currentStudy} onChange={e => setAuthForm(v => ({ ...v, currentStudy: e.target.value }))} /></label>
+      <label>What do you want to learn?<input required placeholder="e.g. Python, AI/ML, Web Development" value={authForm.learningInterest} onChange={e => setAuthForm(v => ({ ...v, learningInterest: e.target.value }))} /></label>
+    </>}<label>Email<input type="email" required autoComplete="email" value={authForm.email} onChange={e => setAuthForm(v => ({ ...v, email: e.target.value }))} /></label><label>Password<input type="password" required minLength={6} autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'} value={authForm.password} onChange={e => setAuthForm(v => ({ ...v, password: e.target.value }))} /></label><button className="btn wide" disabled={authBusy}>{authBusy ? 'Please wait...' : authMode === 'signup' ? 'Sign up' : 'Log in'}</button><p className="muted small">{authMode === 'login' ? 'New here?' : 'Already registered?'} <button type="button" className="text-link" onClick={() => setAuthMode(m => m === 'login' ? 'signup' : 'login')}>{authMode === 'login' ? 'Create an account' : 'Log in instead'}</button></p></form></div></main> : <div className="workspace"><aside className="sidebar"><button className="brand" onClick={() => navigate('home')}><span className="brand-mark">✦</span><span>AI Bharat Mentor<small>LEARN · GROW · ACHIEVE</small></span></button><nav className="side-nav" aria-label="App sections">{MENU.map(([icon, key, label]) => <button key={key} className={page === key ? 'active' : ''} onClick={() => navigate(key)}><span className="nav-icon">{icon}</span>{label}</button>)}</nav><div className="sidebar-bottom"><span className="server-dot" />{serverStatus}</div></aside><main className="workspace-main"><header className="workspace-header"><div className="breadcrumb">AI Bharat Mentor <span> / {MENU.find(x => x[1] === page)?.[2] || 'Dashboard'}</span></div><div className="header-right"><select aria-label="AI language" value={language} onChange={e => setLanguage(e.target.value)}><option value="en">English</option><option value="hi">हिन्दी</option><option value="zh">中文</option></select><button className="avatar" onClick={() => navigate('profile')} title="Profile">{userName[0]?.toUpperCase() || 'P'}</button></div></header><div className="page-content">{content()}</div></main></div>}
     {alert && <div role="alert" className="toast"><span>{alert}</span><button aria-label="Dismiss notification" onClick={() => setAlert('')}>×</button></div>}
   </div>;
 }
