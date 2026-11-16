@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 // AI Bharat Mentor (ABM) — React frontend for existing Flask server.py
 // Start Flask on :5000 and Vite on :5173. No API keys are hard-coded here.
@@ -183,7 +185,7 @@ export default function App() {
   const t = key => UI_TRANSLATIONS[language]?.[key] || key;
   const [alert, setAlert] = useState('');
   const [authMode, setAuthMode] = useState('login');
-  const [authForm, setAuthForm] = useState({ name: '', email: '', password: '', edu: '', city: '', goal: '', skills: '' });
+  const [authForm, setAuthForm] = useState({ name: '', email: '', password: '', edu: '', city: '', goal: '', skills: '', currentStudy: '', learningInterest: '' });
   const [authBusy, setAuthBusy] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState([{ role: 'assistant', content: "Hi! I'm Fugu, your AI career mentor. Tell me your goal." }]);
@@ -376,7 +378,9 @@ export default function App() {
         edu: authForm.edu.trim(),
         city: authForm.city.trim(),
         goal: authForm.goal.trim(),
-        skills: authForm.skills.split(',').map(s => s.trim()).filter(Boolean)
+        skills: authForm.skills.split(',').map(s => s.trim()).filter(Boolean),
+        currentStudy: authForm.currentStudy.trim(),
+        learningInterest: authForm.learningInterest.trim()
       } : null;
 
       localStorage.setItem('abm_react_token', result.token);
@@ -396,9 +400,13 @@ export default function App() {
       setToken(result.token);
       setAccount(result.user);
       const state = result.state || {};
-      setProfile(state.u || signupProfile || { ...profile, name: result.user.name || authForm.name, full: result.user.name || authForm.name, email: result.user.email });
-      const savedProfile = state.u || signupProfile;
-      if (savedProfile?.goal) setRoadmapGoal(savedProfile.goal);
+      const nextProfile = { ...(state.u || signupProfile || profile), name: result.user.name || authForm.name, full: result.user.name || authForm.name, email: result.user.email };
+      if (signup) {
+        nextProfile.currentStudy = authForm.currentStudy.trim();
+        nextProfile.learningInterest = authForm.learningInterest.trim();
+      }
+      setProfile(nextProfile);
+      if (nextProfile.goal) setRoadmapGoal(nextProfile.goal);
       if (Array.isArray(state.dn)) setDone(state.dn);
       if (state.rs) setResume(state.rs);
       if (Array.isArray(state.mh)) setMockHistory(state.mh);
@@ -413,7 +421,7 @@ export default function App() {
         localStorage.setItem("abm_language", state.lang);
       }
       cloudReady.current = true;
-      setAuthForm({ name: '', email: '', password: '', edu: '', city: '', goal: '', skills: '' });
+      setAuthForm({ name: '', email: '', password: '', edu: '', city: '', goal: '', skills: '', currentStudy: '', learningInterest: '' });
       navigate('dashboard');
       notify(signup ? 'Account created successfully.' : 'Welcome back!');
     } catch (error) { notify(error.message); }
@@ -1009,19 +1017,21 @@ Give a score out of 10, identify correct parts, correct mistakes, provide a natu
       </>;
       case 'chat': return <>
         <SectionHeading eyebrow="Powered by your local Ollama model" title="🐡 Fugu AI Mentor" subtitle="Ask questions about programming, careers, roadmaps, resumes and interviews." />
-        <div className="panel chat-panel"><div className="messages" aria-live="polite">{messages.map((m, index) => <div className={`bubble ${m.role === 'user' ? 'mine' : 'fugu'}`} key={index}>{m.role === 'assistant' && <span className="speaker">🐡 Fugu</span>}{m.content}</div>)}{chatBusy && <div className="bubble fugu">Fugu is thinking...</div>}</div>
+        <div className="panel chat-panel"><div className="messages" aria-live="polite">{messages.map((m, index) => <div className={`bubble ${m.role === 'user' ? 'mine' : 'fugu'}`} key={index}>{m.role === 'assistant' && <span className="speaker">🐡 Fugu</span>}{m.role === 'assistant'
+            ? <div className="markdown-content"><ReactMarkdown remarkPlugins={[remarkGfm]}>{String(m.content || '')}</ReactMarkdown></div>
+            : m.content}</div>)}{chatBusy && <div className="bubble fugu">Fugu is thinking...</div>}</div>
           <div className="panel">
-            <h3>?? Fugu Universal Assessment</h3>
+            <h3>🐡 Fugu Universal Assessment</h3>
             {!assessmentActive ? (
               <>
                 <p className="muted">Personalized questions for school students, college learners, adults, professionals and experts.</p>
-                <p><strong>Learner:</strong> {profile.ageGroup || 'General learner'} ? <strong>Level:</strong> {profile.learningLevel || 'Intermediate'}</p>
+                <p><strong>Learner:</strong> {profile.ageGroup || 'General learner'} · <strong>Level:</strong> {profile.learningLevel || 'Intermediate'}</p>
                 <p><strong>Subject:</strong> {profile.subject || 'General'}</p>
-                <button className="btn" type="button" onClick={startInternshipAssessment}>Start My Assessment ?</button>
+                <button className="btn" type="button" onClick={startInternshipAssessment}>Start My Assessment →</button>
               </>
             ) : assessmentIndex < ASSESSMENT_QUESTION_LIMIT ? (
               <>
-                <p className="muted">Question {assessmentIndex + 1} / {ASSESSMENT_QUESTION_LIMIT} ? Difficulty: {assessmentDifficulty}</p>
+                <p className="muted">Question {assessmentIndex + 1} / {ASSESSMENT_QUESTION_LIMIT} · Difficulty: {assessmentDifficulty}</p>
                 {assessmentBusy && <p>Fugu is preparing or evaluating...</p>}
                 {assessmentQuestion && <h3>{assessmentQuestion}</h3>}
                 {!assessmentQuestion && !assessmentBusy && <button className="btn" type="button" onClick={() => generateAssessmentQuestion(assessmentIndex + 1, assessmentDifficulty)}>Try generating question again</button>}
@@ -1033,7 +1043,7 @@ Give a score out of 10, identify correct parts, correct mistakes, provide a natu
                   <div className="bubble fugu">
                     <strong>Fugu feedback</strong>
                     <p>{assessmentFeedback}</p>
-                    {assessmentQuestion && <button className="btn" type="button" onClick={nextAssessmentQuestion}>Next question ?</button>}
+                    {assessmentQuestion && <button className="btn" type="button" onClick={nextAssessmentQuestion}>Next question →</button>}
                   </div>
                 )}
               </>
@@ -1045,8 +1055,7 @@ Give a score out of 10, identify correct parts, correct mistakes, provide a natu
                 <button className="btn subtle" type="button" onClick={() => setAssessmentActive(false)}>Close assessment</button>
               </>
             )}
-          </div>
-          <div className="prompts">{['Beginner Python roadmap', 'BCA internship preparation', 'Explain Flask APIs'].map(q => <button key={q} onClick={() => setChatInput(q)}>{q}</button>)}</div>
+          </div>          <div className="prompts">{['Beginner Python roadmap', 'BCA internship preparation', 'Explain Flask APIs'].map(q => <button key={q} onClick={() => setChatInput(q)}>{q}</button>)}</div>
           <form className="chat-form" onSubmit={sendMessage}><input aria-label="Message Fugu" placeholder="Ask Fugu anything..." value={chatInput} onChange={e => setChatInput(e.target.value)} /><button className="btn" type="submit" disabled={chatBusy || !chatInput.trim()}>Send ➤</button></form>
         </div>
       </>;
@@ -1106,6 +1115,26 @@ Give a score out of 10, identify correct parts, correct mistakes, provide a natu
             aria-valuenow={Number(careerResult.skill_match_percentage || 0)}>
             <div style={{ width: `${Math.max(0, Math.min(100, Number(careerResult.skill_match_percentage || 0)))}%` }} />
           </div>
+          {(() => {
+            const matched = resultSkillList(careerResult.matched_skills);
+            const missing = resultSkillList(careerResult.missing_skills);
+            const total = matched.length + missing.length;
+            const matchedPct = total ? matched.length / total * 100 : 0;
+            return <div className="panel" style={{ marginTop: 18 }}>
+              <h3>Skill Learning Overview</h3>
+              <div className="stats">
+                <div><span className="muted small">Total required</span><h3>{total}</h3></div>
+                <div><span className="muted small">Matched</span><h3>{matched.length}</h3></div>
+                <div><span className="muted small">To learn</span><h3>{missing.length}</h3></div>
+              </div>
+              <div role="img" aria-label={`${matched.length} matched and ${missing.length} skills to learn`}
+                style={{ display: "flex", height: 18, borderRadius: 20, overflow: "hidden", background: "var(--bg)", marginTop: 12 }}>
+                <div style={{ width: `${matchedPct}%`, background: "var(--cyan)" }} />
+                <div style={{ width: `${100 - matchedPct}%`, background: "var(--purple)" }} />
+              </div>
+              <p className="muted small" style={{ marginTop: 10 }}>Selected skills matched: {matched.length} ? Skills still to learn: {missing.length}</p>
+            </div>;
+          })()}
           <h3 style={{ marginTop: 18 }}>✅ Matched skills</h3>
           <div className="tags">{resultSkillList(careerResult.matched_skills).length
             ? resultSkillList(careerResult.matched_skills).map(s => <Tag key={s}>{s}</Tag>)
@@ -1136,6 +1165,23 @@ Give a score out of 10, identify correct parts, correct mistakes, provide a natu
       </>;
       case 'progress': return <>
         <SectionHeading eyebrow="Keep going" title="My Learning Progress" subtitle="Your roadmap tasks and mock interview history." />
+        <div className="panel">
+          <h3>Learning Progress Graph</h3>
+          <div style={{ marginTop: 16 }}>
+            <div className="split-heading"><strong>General roadmap</strong><strong>{percent}%</strong></div>
+            <div className="meter" role="progressbar" aria-label="General roadmap completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
+              <div style={{ width: `${percent}%` }} />
+            </div>
+            <p className="muted small">{done.length} of {ROADMAP.length} milestones completed</p>
+          </div>
+          <div style={{ marginTop: 20 }}>
+            <div className="split-heading"><strong>Fugu personalized roadmap</strong><strong>{aiRoadmap ? `${aiPercent}%` : "Not started"}</strong></div>
+            <div className="meter" role="progressbar" aria-label="Fugu roadmap completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={aiPercent}>
+              <div style={{ width: `${aiPercent}%` }} />
+            </div>
+            <p className="muted small">{aiRoadmap ? `${aiCompleted.filter(id => aiRoadmap.tasks.some(task => task.id === id)).length} of ${aiRoadmap.tasks.length} personalized tasks completed` : "Generate a Fugu roadmap to start tracking personalized tasks."}</p>
+          </div>
+        </div>
         <div className="stats"><div className="panel"><span className="muted">Completed tasks</span><h3>{done.length}</h3></div><div className="panel"><span className="muted">Overall completion</span><h3>{percent}% general · {aiRoadmap ? `${aiPercent}% Fugu plan` : 'No Fugu plan yet'}</h3></div><div className="panel"><span className="muted">Mock interview sessions</span><h3>{mockHistory.length}</h3></div></div>
         {aiRoadmap && <div className="panel"><h3>🐡 Fugu Roadmap · {aiRoadmap.goal}</h3>
           <p className="muted">{aiCompleted.length} of {aiRoadmap.tasks.length} personalized weekly tasks completed.</p>
@@ -1360,6 +1406,8 @@ Give a score out of 10, identify correct parts, correct mistakes, provide a natu
             </label>
           </div>
           <label>Skills (comma separated)<input value={(profile.skills || []).join(', ')} onChange={e => setProfile(p => ({ ...p, skills: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))} /></label>
+          <label>Current Study<input value={profile.currentStudy || ''} onChange={e => setProfile(p => ({ ...p, currentStudy: e.target.value }))} /></label>
+          <label>What do you want to learn?<input value={profile.learningInterest || ''} onChange={e => setProfile(p => ({ ...p, learningInterest: e.target.value }))} /></label>
           <p className="muted small">Changes save automatically in this browser. When logged in, they also sync to your Flask /api/state.</p>
           {account && <button className="btn subtle" onClick={logout}>Log out</button>}
         </div>
@@ -1442,6 +1490,8 @@ Give a score out of 10, identify correct parts, correct mistakes, provide a natu
       </section>
       <div className="landing-founder"><Founder /></div>
     </> : page === 'login' ? <main className="auth-shell"><button className="back" onClick={() => navigate('home')}>← Back to Home</button><div className="auth-layout"><div className="auth-intro"><span className="eyebrow">AI Bharat Mentor</span><h1>Learn today.<br /><span className="gradient-text">Lead tomorrow.</span></h1><span className="fugu">🐡</span></div><form className="panel auth-form" onSubmit={authenticate}><h2>{authMode === 'signup' ? 'Create your account' : 'Welcome back'}</h2><p className="muted">Continue your journey toward your goals.</p>{authMode === 'signup' && <label>Full Name<input required minLength={2} autoComplete="name" value={authForm.name} onChange={e => setAuthForm(v => ({ ...v, name: e.target.value }))} /></label>}{authMode === 'signup' && <>
+<label>Current Study<input required placeholder="e.g. BCA, B.Tech, Class 12, BA" value={authForm.currentStudy} onChange={e => setAuthForm(v => ({ ...v, currentStudy: e.target.value }))} /></label>
+<label>What do you want to learn?<input required placeholder="e.g. Python, AI/ML, Web Development" value={authForm.learningInterest} onChange={e => setAuthForm(v => ({ ...v, learningInterest: e.target.value }))} /></label>
 <label>Education<input required value={authForm.edu} onChange={e => setAuthForm(v => ({ ...v, edu: e.target.value }))} placeholder="e.g. BCA 2nd Year" /></label>
 <label>City<input required value={authForm.city} onChange={e => setAuthForm(v => ({ ...v, city: e.target.value }))} placeholder="Your city" /></label>
 <label>Career Goal<input required value={authForm.goal} onChange={e => setAuthForm(v => ({ ...v, goal: e.target.value }))} placeholder="e.g. Data Analyst" /></label>

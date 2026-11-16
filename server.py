@@ -213,6 +213,16 @@ def init_db():
                 created_at BIGINT NOT NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""")
 
+            cur.execute("""CREATE TABLE IF NOT EXISTS visitors (
+                visitor_id VARCHAR(64) PRIMARY KEY,
+                created_at BIGINT NOT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""")
+
+            cur.execute("""CREATE TABLE IF NOT EXISTS ai_sessions (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                created_at BIGINT NOT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""")
+
         print(
             f"🗄️ MySQL connected: "
             f"{MYSQL['host']}:{MYSQL['port']} database={MYSQL_DB}"
@@ -226,6 +236,49 @@ def init_db():
 
 
 
+
+def record_ai_session():
+    """Successful AI response ko database mein count karta hai."""
+    try:
+        with dbc() as conn, conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO ai_sessions (created_at) VALUES (%s)",
+                (int(time.time()),)
+            )
+    except Exception:
+        app.logger.exception("AI session count save nahi ho paya")
+
+
+@app.post("/api/public/visit")
+def public_visit():
+    d = body()
+    visitor_id = str(d.get("visitor_id", "")).strip()
+    if not visitor_id or len(visitor_id) > 64:
+        raise ApiError("Invalid visitor ID")
+
+    with dbc() as conn, conn.cursor() as cur:
+        cur.execute(
+            "INSERT IGNORE INTO visitors (visitor_id, created_at) VALUES (%s, %s)",
+            (visitor_id, int(time.time()))
+        )
+    return jsonify({"ok": True})
+
+
+@app.get("/api/public/stats")
+def public_stats():
+    with dbc() as conn, conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) AS n FROM users")
+        registered_users = cur.fetchone()["n"]
+        cur.execute("SELECT COUNT(*) AS n FROM visitors")
+        total_visitors = cur.fetchone()["n"]
+        cur.execute("SELECT COUNT(*) AS n FROM ai_sessions")
+        ai_sessions = cur.fetchone()["n"]
+
+    return jsonify({
+        "registered_users": registered_users,
+        "total_visitors": total_visitors,
+        "ai_sessions": ai_sessions
+    })
 
 def _json(x, default):
 
@@ -565,7 +618,12 @@ OLLAMA_MODEL = os.getenv(
 
 
 
-USE_BRAIN = os.getenv("USE_BRAIN", "0") == "1" and brain is not None
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b").strip()
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+# Disable fixed knowledge-base answers in the live chat.
+USE_BRAIN = False
 
 
 
@@ -583,9 +641,49 @@ beginner-friendly and honest answers.
 
 
 
-LANGN = {"en": "English", "zh": "Chinese", "hi": "Hindi", "bn": "Bengali", "ta": "Tamil", "te": "Telugu",
-
-         "mr": "Marathi", "gu": "Gujarati", "kn": "Kannada", "ml": "Malayalam", "pa": "Punjabi"}
+LANGN = {
+    "en": "English",
+    "zh": "Chinese",
+    "as": "Assamese",
+    "bn": "Bengali",
+    "brx": "Bodo",
+    "doi": "Dogri",
+    "gu": "Gujarati",
+    "hi": "Hindi",
+    "hinglish": "Hinglish (Hindi and English mixed, written in Roman script)",
+    "kn": "Kannada",
+    "ks": "Kashmiri",
+    "kok": "Konkani",
+    "mai": "Maithili",
+    "ml": "Malayalam",
+    "mni": "Manipuri",
+    "mr": "Marathi",
+    "ne": "Nepali",
+    "or": "Odia",
+    "pa": "Punjabi",
+    "sa": "Sanskrit",
+    "sat": "Santali",
+    "sd": "Sindhi",
+    "ta": "Tamil",
+    "te": "Telugu",
+    "ur": "Urdu",
+    "es": "Spanish",
+    "fr": "French",
+    "de": "German",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "ar": "Arabic",
+    "pt": "Portuguese",
+    "ru": "Russian",
+    "it": "Italian",
+    "id": "Indonesian",
+    "tr": "Turkish",
+    "th": "Thai",
+    "vi": "Vietnamese",
+    "nl": "Dutch",
+    "sw": "Swahili",
+    "fa": "Persian",
+}
 
 
 
@@ -664,83 +762,79 @@ def clean_history(history):
 
 
 def ask(message, history=None, profile=None, lang="en"):
-
-    """Jawab deta hai: {"reply": "...", "provider": "brain" | "ollama"}.
-
-    Ollama na chale to AIUnavailable uthata hai."""
-
+    """Groq online AI first; local Ollama is the fallback."""
     message = str(message).strip()[:MAX_MSG]
-
     history = clean_history(history)
-
     profile = profile if isinstance(profile, dict) else {}
-
     lang = lang if lang in LANGN else "en"
 
+    messages = [
+        {"role": "system", "content": build_prompt(profile, lang)},
+        *history,
+        {"role": "user", "content": message},
+    ]
 
+    groq_error = None
 
-    if USE_BRAIN:                                    # pehle apna Fugu Brain (tez), na mile to Ollama
+    # 1. Hosted website: use Groq when an API key is configured.
+    if GROQ_API_KEY:
+        try:
+            response = requests.post(
+                GROQ_URL,
+                headers={
+                    "Authorization": f"Bearer {GROQ_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": GROQ_MODEL,
+                    "messages": messages,
+                    "stream": False,
+                },
+                timeout=(10, 60),
+            )
+            response.raise_for_status()
+            result = response.json()
+            reply = (result["choices"][0]["message"]["content"] or "").strip()
+            if not reply:
+                raise ValueError("Groq returned an empty reply")
+            return {"reply": reply, "provider": "groq"}
+        except (
+            requests.exceptions.RequestException,
+            KeyError,
+            IndexError,
+            ValueError,
+            TypeError,
+        ) as e:
+            groq_error = e
+            app.logger.warning("Groq request failed; trying Ollama fallback: %s", e)
 
-        prev = next((m["content"] for m in reversed(history) if m["role"] == "user"), None)
-
-        ctx = {"name": clean(profile.get("name")), "goal": clean(profile.get("goal")),
-
-               "edu": clean(profile.get("edu")), "lang": lang, "prev": prev}
-
-        o = brain.answer(message, ctx)
-
-        if o:
-
-            return {"reply": o["text"], "provider": "brain"}
-
-
-
+    # 2. Local development: use Ollama if it is running.
     try:
-
         response = requests.post(
-
             f"{OLLAMA_URL}/api/chat",
-
             json={
-
                 "model": OLLAMA_MODEL,
-
-                "messages": [
-
-                    {"role": "system", "content": build_prompt(profile, lang)},
-
-                    *history,
-
-                    {"role": "user", "content": message},
-
-                ],
-
+                "messages": messages,
                 "stream": False,
-
             },
-
             timeout=(5, 180),
-
         )
-
         response.raise_for_status()
-
         result = response.json()
-
         reply = (result["message"]["content"] or "").strip()
-
         if not reply:
-
-            raise ValueError("empty reply")
-
+            raise ValueError("Ollama returned an empty reply")
         return {"reply": reply, "provider": "ollama"}
-
-    except (requests.exceptions.RequestException, KeyError, ValueError, TypeError) as e:
-
-        raise AIUnavailable(OLLAMA_DOWN_MSG) from e
-
-
-
+    except (
+        requests.exceptions.RequestException,
+        KeyError,
+        ValueError,
+        TypeError,
+    ) as e:
+        app.logger.warning("Ollama request failed: %s", e)
+        raise AIUnavailable(
+            "Fugu AI abhi connect nahi ho pa raha. Please thodi der baad try karo."
+        ) from (groq_error or e)
 
 
 def ollama_status():
@@ -775,7 +869,7 @@ def ollama_status():
 
 def health():
 
-    return jsonify({"status": "ok", "service": "AI Bharat Mentor", "brain": USE_BRAIN, "frontend": str(FRONT), "frontend_new": frontend_is_new(), **mysql_status(), **ollama_status()})
+    return jsonify({"status": "ok", "service": "AI Bharat Mentor", "brain": USE_BRAIN, "groq_configured": bool(GROQ_API_KEY), "groq_model": GROQ_MODEL, "frontend": str(FRONT), "frontend_new": frontend_is_new(), **mysql_status(), **ollama_status()})
 
 
 
@@ -1184,6 +1278,7 @@ def chat():
     try:
 
         out = ask(message, history=history, profile=profile, lang=d.get("lang"))
+        record_ai_session()
 
     except AIUnavailable as e:
 
@@ -1332,6 +1427,7 @@ def ask_route():
     try:
 
         out = ask(message.strip()[:MAX_MSG], history=history, profile=profile, lang=d.get("lang"))
+        record_ai_session()
 
     except AIUnavailable as e:
 
