@@ -7,9 +7,24 @@ const MENU = [
   ['🏠', 'dashboard', 'Dashboard'], ['🧭', 'roadmap', 'Career Roadmap'],
   ['📚', 'library', 'Study Library'], ['🤖', 'chat', 'Fugu AI Mentor'],
   ['📊', 'skills', 'Skill Analysis'], ['📈', 'progress', 'Progress'],
+  ['🌍', 'languages', 'Language Learning'],
   ['📄', 'resume', 'Resume Builder'], ['🎤', 'mock', 'Mock Interview'],
   ['👤', 'profile', 'Profile & Settings'], ['✨', 'founder', 'About Founder']
 ];
+const UI_TRANSLATIONS = {
+  hi: {
+    "Dashboard": "डैशबोर्ड",
+    "Career Roadmap": "करियर रोडमैप",
+    "Study Library": "अध्ययन सामग्री",
+    "Fugu AI Mentor": "फुगु AI मेंटर",
+    "Skill Analysis": "कौशल विश्लेषण",
+    "Progress": "प्रगति",
+    "Resume Builder": "रिज़्यूमे बनाएँ",
+    "Mock Interview": "मॉक इंटरव्यू",
+    "Profile & Settings": "प्रोफ़ाइल और सेटिंग्स",
+    "About Founder": "संस्थापक के बारे में"
+  }
+};
 const ROADMAP = [
   ['Python Basics', 'Learn variables, loops, functions and files'],
   ['HTML & CSS', 'Build your first responsive web page'],
@@ -27,9 +42,12 @@ const QUESTIONS = {
   HR: ['Tell me about yourself.', 'Why do you want this internship?', 'What motivates you?', 'Where do you see yourself in five years?'],
   Behavioral: ['Describe a problem you solved.', 'How do you handle deadlines?', 'Tell me about something new you learned.', 'What would you do after receiving criticism?']
 };
+const ASSESSMENT_QUESTION_LIMIT = 5;
 const DEFAULT_PROFILE = {
-  name: '', full: '', email: '', edu: 'BCA Student', goal: 'Software Developer',
-  city: 'Delhi', skills: ['Python', 'HTML', 'CSS']
+  name: '', full: '', email: '', edu: 'BCA Student', goal: 'Explore careers',
+  city: 'Delhi', skills: ['Python', 'HTML', 'CSS'],
+  ageGroup: 'College student', classLevel: '',
+  subject: 'General', learningLevel: 'Intermediate'
 };
 const DEFAULT_RESUME = { name: '', title: 'BCA Student', education: 'Bachelor of Computer Applications', skills: 'Python, Flask, SQL, React', projects: 'AI Bharat Mentor — AI-powered career guidance platform', summary: 'Motivated student developer building accessible AI learning products.' };
 const FALLBACK_SKILLS = [
@@ -148,20 +166,37 @@ export default function App() {
   const [learningState, setLearningState] = useState(() =>
     saved.lp && typeof saved.lp === 'object' && !Array.isArray(saved.lp) ? saved.lp : {});
   const [roadmapGoal, setRoadmapGoal] = useState(() =>
-    saved.lp?.fuguRoadmap?.goal || saved.u?.goal || DEFAULT_PROFILE.goal);
+    saved.u?.goal || saved.lp?.fuguRoadmap?.goal || DEFAULT_PROFILE.goal);
   const [roadmapHours, setRoadmapHours] = useState(() =>
     Number(saved.lp?.fuguRoadmap?.hours) || 2);
   const [roadmapBusy, setRoadmapBusy] = useState(false);
   const [roadmapError, setRoadmapError] = useState('');
   const roadmapRequest = useRef(0);
-  const [language, setLanguage] = useState('en');
+  const [language, setLanguage] = useState(() => localStorage.getItem('abm_language') || saved.lang || 'en');
+  const [learningLanguage, setLearningLanguage] = useState(() => localStorage.getItem('abm_learning_language') || 'Japanese');
+  const [languageLevel, setLanguageLevel] = useState(() => localStorage.getItem('abm_language_level') || 'Beginner');
+  const [languageTopic, setLanguageTopic] = useState(() => localStorage.getItem('abm_language_topic') || 'Greetings and introductions');
+  const [languageLesson, setLanguageLesson] = useState('');
+  const [languageAnswer, setLanguageAnswer] = useState('');
+  const [languageFeedback, setLanguageFeedback] = useState('');
+  const [languageBusy, setLanguageBusy] = useState(false);
+  const t = key => UI_TRANSLATIONS[language]?.[key] || key;
   const [alert, setAlert] = useState('');
   const [authMode, setAuthMode] = useState('login');
-  const [authForm, setAuthForm] = useState({ name: '', email: '', password: '' });
+  const [authForm, setAuthForm] = useState({ name: '', email: '', password: '', edu: '', city: '', goal: '', skills: '' });
   const [authBusy, setAuthBusy] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState([{ role: 'assistant', content: "Hi! I'm Fugu, your AI career mentor. Tell me your goal." }]);
   const [chatBusy, setChatBusy] = useState(false);
+  const [assessmentActive, setAssessmentActive] = useState(false);
+  const [assessmentQuestion, setAssessmentQuestion] = useState('');
+  const [assessmentDifficulty, setAssessmentDifficulty] = useState('Intermediate');
+  const [assessmentAskedQuestions, setAssessmentAskedQuestions] = useState([]);
+  const [assessmentIndex, setAssessmentIndex] = useState(0);
+  const [assessmentAnswer, setAssessmentAnswer] = useState('');
+  const [assessmentFeedback, setAssessmentFeedback] = useState('');
+  const [assessmentScore, setAssessmentScore] = useState(0);
+  const [assessmentBusy, setAssessmentBusy] = useState(false);
   const [library, setLibrary] = useState([]);
   const [libError, setLibError] = useState('');
   const [libBusy, setLibBusy] = useState(false);
@@ -209,6 +244,12 @@ export default function App() {
   const userName = account?.name || profile.name || 'Learner';
 
   useEffect(() => {
+    localStorage.setItem('abm_learning_language', learningLanguage);
+    localStorage.setItem('abm_language_level', languageLevel);
+    localStorage.setItem('abm_language_topic', languageTopic);
+  }, [learningLanguage, languageLevel, languageTopic]);
+
+  useEffect(() => {
     const visitorId = getBrowserId(localStorage, 'abm_visitor_id');
     api('/api/public/visit', {
       method: 'POST',
@@ -242,13 +283,17 @@ export default function App() {
         if (cancelled) return;
         setAccount(me);
         if (state.u) setProfile(state.u);
+        if (typeof state.lang === 'string' && state.lang) {
+          setLanguage(state.lang);
+          localStorage.setItem('abm_language', state.lang);
+        }
         if (Array.isArray(state.dn)) setDone(state.dn);
         if (state.rs) setResume(state.rs);
         if (Array.isArray(state.mh)) setMockHistory(state.mh);
         if (Array.isArray(state.bm)) setBookmarks(state.bm);
         if (state.lp && typeof state.lp === 'object' && !Array.isArray(state.lp)) {
           setLearningState(state.lp);
-          if (state.lp.fuguRoadmap?.goal) setRoadmapGoal(state.lp.fuguRoadmap.goal);
+          if (state.u?.goal) setRoadmapGoal(state.u.goal); else if (!savedProfile?.goal && state.lp.fuguRoadmap?.goal) setRoadmapGoal(state.lp.fuguRoadmap.goal);
           if (state.lp.fuguRoadmap?.hours) setRoadmapHours(Number(state.lp.fuguRoadmap.hours));
         }
         navigate('dashboard');
@@ -265,16 +310,17 @@ export default function App() {
   }, []); // Session check happens once; regular state saves are handled below.
 
   useEffect(() => {
-    localStorage.setItem(KEY, JSON.stringify({ u: profile, dn: done, rs: resume, mh: mockHistory, bm: bookmarks, lp: learningState }));
+    localStorage.setItem(KEY, JSON.stringify({ u: profile, dn: done, rs: resume, mh: mockHistory, bm: bookmarks, lp: learningState, lang: language }));
+    localStorage.setItem('abm_language', language);
     if (firstRender.current) { firstRender.current = false; return; }
     if (!token || !cloudReady.current) return;
     const timer = setTimeout(() => {
       api('/api/state', {
-        token, method: 'PUT', body: JSON.stringify({ u: profile, dn: done, rs: resume, mh: mockHistory, bm: bookmarks, lp: learningState })
+        token, method: 'PUT', body: JSON.stringify({ u: profile, dn: done, rs: resume, mh: mockHistory, bm: bookmarks, lp: learningState, lang: language })
       }).catch(() => notify('Changes saved locally; server sync failed.'));
     }, 900);
     return () => clearTimeout(timer);
-  }, [profile, done, resume, mockHistory, bookmarks, learningState, token]);
+  }, [profile, done, resume, mockHistory, bookmarks, learningState, language, token]);
 
   useEffect(() => {
     if (page === 'library') refreshLibrary();
@@ -322,16 +368,52 @@ export default function App() {
       const result = await api(`/api/auth/${signup ? 'signup' : 'login'}`, {
         method: 'POST', body: JSON.stringify(authForm)
       });
+      let profileSaved = true;
+      const signupProfile = signup ? {
+        name: authForm.name.trim().split(/\s+/)[0] || '',
+        full: authForm.name.trim(),
+        email: authForm.email.trim().toLowerCase(),
+        edu: authForm.edu.trim(),
+        city: authForm.city.trim(),
+        goal: authForm.goal.trim(),
+        skills: authForm.skills.split(',').map(s => s.trim()).filter(Boolean)
+      } : null;
+
       localStorage.setItem('abm_react_token', result.token);
+
+      if (signup) {
+        try {
+          await api('/api/state', {
+            token: result.token,
+            method: 'PUT',
+            body: JSON.stringify({ u: signupProfile })
+          });
+        } catch (saveError) {
+          profileSaved = false;
+          console.error('Signup profile save failed:', saveError);
+        }
+      }
       setToken(result.token);
       setAccount(result.user);
       const state = result.state || {};
-      setProfile(state.u || { ...profile, name: result.user.name || authForm.name, full: result.user.name || authForm.name, email: result.user.email });
+      setProfile(state.u || signupProfile || { ...profile, name: result.user.name || authForm.name, full: result.user.name || authForm.name, email: result.user.email });
+      const savedProfile = state.u || signupProfile;
+      if (savedProfile?.goal) setRoadmapGoal(savedProfile.goal);
       if (Array.isArray(state.dn)) setDone(state.dn);
       if (state.rs) setResume(state.rs);
       if (Array.isArray(state.mh)) setMockHistory(state.mh);
+      if (Array.isArray(state.bm)) setBookmarks(state.bm);
+      if (state.lp && typeof state.lp === "object" && !Array.isArray(state.lp)) {
+        setLearningState(state.lp);
+        if (state.lp.fuguRoadmap?.goal) setRoadmapGoal(state.lp.fuguRoadmap.goal);
+        if (state.lp.fuguRoadmap?.hours) setRoadmapHours(Number(state.lp.fuguRoadmap.hours));
+      }
+      if (typeof state.lang === "string" && state.lang) {
+        setLanguage(state.lang);
+        localStorage.setItem("abm_language", state.lang);
+      }
       cloudReady.current = true;
-      setAuthForm({ name: '', email: '', password: '' });
+      setAuthForm({ name: '', email: '', password: '', edu: '', city: '', goal: '', skills: '' });
       navigate('dashboard');
       notify(signup ? 'Account created successfully.' : 'Welcome back!');
     } catch (error) { notify(error.message); }
@@ -360,6 +442,111 @@ export default function App() {
     } catch (error) {
       setMessages(prev => [...prev, { role: 'assistant', content: `⚠ ${error.message}. Check Ollama and your login.` }]);
     } finally { setChatBusy(false); }
+  }
+
+  async function generateAssessmentQuestion(number, difficulty) {
+    setAssessmentBusy(true);
+    setAssessmentFeedback('');
+    setAssessmentQuestion('');
+    try {
+      const prompt = [
+        'You are Fugu, an inclusive AI teacher and examiner.',
+        'Generate exactly ONE fresh assessment question.',
+        'Do not give the answer, hints, or multiple questions.',
+        'Age group: ' + (profile.ageGroup || 'General learner'),
+        'Class, course or job role: ' + (profile.classLevel || profile.edu || 'Not specified'),
+        'Subject: ' + (profile.subject || 'General'),
+        'Career goal: ' + (profile.goal || 'Not specified'),
+        'Skills: ' + (profile.skills || []).join(', '),
+        'Learner level: ' + (profile.learningLevel || 'Intermediate'),
+        'Current difficulty: ' + difficulty,
+        'Question number: ' + number + ' of ' + ASSESSMENT_QUESTION_LIMIT,
+        'Use age-appropriate language and curriculum.',
+        'For school students, use their class level.',
+        'For college students, use their course and practical concepts.',
+        'For adults, use useful everyday learning examples.',
+        'For professionals, use workplace scenarios.',
+        'For experts, use advanced problem solving.',
+        'Do not repeat these earlier questions: ' + assessmentAskedQuestions.join(' | '),
+        'Reply in the selected language: ' + language,
+        'Output only the question.'
+      ].join('\\n');
+
+      const result = await api('/api/chat', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({ message: prompt, lang: language, history: [], profile })
+      });
+      const question = result.reply || result.answer || '';
+      if (!question.trim()) throw new Error('Fugu returned an empty question.');
+      setAssessmentQuestion(question.trim());
+      setAssessmentAskedQuestions(prev => [...prev, question.trim()]);
+    } catch (error) {
+      setAssessmentFeedback('Question generation failed: ' + error.message);
+    } finally {
+      setAssessmentBusy(false);
+    }
+  }
+
+  async function startInternshipAssessment() {
+    setAssessmentActive(true);
+    setAssessmentIndex(0);
+    setAssessmentAnswer('');
+    setAssessmentFeedback('');
+    setAssessmentScore(0);
+    setAssessmentAskedQuestions([]);
+    const level = profile.learningLevel || 'Intermediate';
+    setAssessmentDifficulty(level);
+    await generateAssessmentQuestion(1, level);
+  }
+
+  async function submitAssessmentAnswer() {
+    if (!assessmentAnswer.trim() || assessmentBusy || !assessmentQuestion) return;
+    setAssessmentBusy(true);
+    try {
+      const prompt = [
+        'You are Fugu, a fair and supportive examiner.',
+        'Evaluate the learner answer to the exact question.',
+        'Give a score from 0 to 10.',
+        'Explain correct points, mistakes, and provide a model answer.',
+        'Use age-appropriate language.',
+        'Start with exactly: SCORE: X/10',
+        'Do not ask another question.',
+        'Question: ' + assessmentQuestion,
+        'Learner answer: ' + assessmentAnswer.trim()
+      ].join('\\n');
+
+      const result = await api('/api/chat', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({ message: prompt, lang: language, history: [], profile })
+      });
+      const feedback = result.reply || result.answer || 'No feedback returned.';
+      const match = feedback.match(/SCORE:\s*(10|[0-9])\s*\/\s*10/i);
+      const score = match ? Number(match[1]) : 0;
+      setAssessmentScore(prev => prev + score);
+      setAssessmentFeedback(feedback);
+
+      if (score >= 8) setAssessmentDifficulty('Advanced');
+      else if (score <= 4) setAssessmentDifficulty('Beginner');
+      else setAssessmentDifficulty('Intermediate');
+
+      setAssessmentAnswer('');
+    } catch (error) {
+      setAssessmentFeedback('Assessment error: ' + error.message);
+    } finally {
+      setAssessmentBusy(false);
+    }
+  }
+
+  async function nextAssessmentQuestion() {
+    const next = assessmentIndex + 1;
+    setAssessmentFeedback('');
+    setAssessmentAnswer('');
+    setAssessmentIndex(next);
+    if (next < ASSESSMENT_QUESTION_LIMIT) {
+      await generateAssessmentQuestion(next + 1, assessmentDifficulty);
+    }
   }
 
   async function refreshLibrary() {
@@ -655,6 +842,72 @@ export default function App() {
     }
   }
 
+
+  async function generateLanguagePractice(mode = 'lesson') {
+    if (languageBusy) return;
+    setLanguageBusy(true);
+    setLanguageFeedback('');
+
+    const instructions = {
+      lesson: 'Teach a structured lesson with vocabulary, native script, pronunciation, meanings, grammar, examples and 3 practice questions.',
+      conversation: 'Start a realistic role-play. Show one target-language sentence, pronunciation and meaning, then ask me one question and wait.',
+      quiz: 'Create a 5-question quiz. Ask one question at a time and do not reveal answers before I respond.'
+    };
+
+    const prompt = `Act as a patient language teacher for AI Bharat Mentor.
+Target language: ${learningLanguage}.
+Explain in: ${language}.
+Level: ${languageLevel}.
+Age group: ${profile.ageGroup || 'Learner'}.
+Class/course/job: ${profile.classLevel || 'Not specified'}.
+Topic: ${languageTopic || 'Everyday communication'}.
+Activity: ${mode}.
+Instructions: ${instructions[mode]}
+Use correct writing, pronunciation or transliteration, meanings and age-appropriate examples. Keep it practical and suitable for the learner's level.`;
+
+    try {
+      const result = await api('/api/chat', {
+        token, method: 'POST',
+        body: JSON.stringify({ message: prompt, lang: language, history: [], profile })
+      });
+      const reply = result.reply || result.answer || '';
+      if (!reply.trim()) throw new Error('Fugu returned an empty lesson.');
+      setLanguageLesson(reply);
+    } catch (error) {
+      notify(`Language lesson error: ${error.message}`);
+    } finally {
+      setLanguageBusy(false);
+    }
+  }
+
+  async function checkLanguagePractice() {
+    if (!languageAnswer.trim() || languageBusy) return;
+    setLanguageBusy(true);
+    setLanguageFeedback('');
+
+    const prompt = `You are a kind and encouraging language teacher.
+Target language: ${learningLanguage}.
+Explain in: ${language}.
+Level: ${languageLevel}.
+Lesson context: ${languageLesson || 'General practice'}.
+Learner answer: ${languageAnswer.trim()}.
+Give a score out of 10, identify correct parts, correct mistakes, provide a natural version, explain why and give one improvement tip.`;
+
+    try {
+      const result = await api('/api/chat', {
+        token, method: 'POST',
+        body: JSON.stringify({ message: prompt, lang: language, history: [], profile })
+      });
+      const reply = result.reply || result.answer || '';
+      if (!reply.trim()) throw new Error('Fugu returned no feedback.');
+      setLanguageFeedback(reply);
+    } catch (error) {
+      notify(`Answer check error: ${error.message}`);
+    } finally {
+      setLanguageBusy(false);
+    }
+  }
+
   function content() {
     switch (page) {
       case 'dashboard': return <>
@@ -757,6 +1010,42 @@ export default function App() {
       case 'chat': return <>
         <SectionHeading eyebrow="Powered by your local Ollama model" title="🐡 Fugu AI Mentor" subtitle="Ask questions about programming, careers, roadmaps, resumes and interviews." />
         <div className="panel chat-panel"><div className="messages" aria-live="polite">{messages.map((m, index) => <div className={`bubble ${m.role === 'user' ? 'mine' : 'fugu'}`} key={index}>{m.role === 'assistant' && <span className="speaker">🐡 Fugu</span>}{m.content}</div>)}{chatBusy && <div className="bubble fugu">Fugu is thinking...</div>}</div>
+          <div className="panel">
+            <h3>?? Fugu Universal Assessment</h3>
+            {!assessmentActive ? (
+              <>
+                <p className="muted">Personalized questions for school students, college learners, adults, professionals and experts.</p>
+                <p><strong>Learner:</strong> {profile.ageGroup || 'General learner'} ? <strong>Level:</strong> {profile.learningLevel || 'Intermediate'}</p>
+                <p><strong>Subject:</strong> {profile.subject || 'General'}</p>
+                <button className="btn" type="button" onClick={startInternshipAssessment}>Start My Assessment ?</button>
+              </>
+            ) : assessmentIndex < ASSESSMENT_QUESTION_LIMIT ? (
+              <>
+                <p className="muted">Question {assessmentIndex + 1} / {ASSESSMENT_QUESTION_LIMIT} ? Difficulty: {assessmentDifficulty}</p>
+                {assessmentBusy && <p>Fugu is preparing or evaluating...</p>}
+                {assessmentQuestion && <h3>{assessmentQuestion}</h3>}
+                {!assessmentQuestion && !assessmentBusy && <button className="btn" type="button" onClick={() => generateAssessmentQuestion(assessmentIndex + 1, assessmentDifficulty)}>Try generating question again</button>}
+                {assessmentQuestion && <>
+                  <textarea rows={4} value={assessmentAnswer} onChange={e => setAssessmentAnswer(e.target.value)} placeholder="Write your answer here..." />
+                  <button className="btn" type="button" disabled={assessmentBusy || !assessmentAnswer.trim()} onClick={submitAssessmentAnswer}>{assessmentBusy ? 'Fugu is evaluating...' : 'Submit answer'}</button>
+                </>}
+                {assessmentFeedback && (
+                  <div className="bubble fugu">
+                    <strong>Fugu feedback</strong>
+                    <p>{assessmentFeedback}</p>
+                    {assessmentQuestion && <button className="btn" type="button" onClick={nextAssessmentQuestion}>Next question ?</button>}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <h3>Assessment completed!</h3>
+                <p>Your total score: {assessmentScore} / {ASSESSMENT_QUESTION_LIMIT * 10}</p>
+                <button className="btn" type="button" onClick={startInternshipAssessment}>Start a new assessment</button>
+                <button className="btn subtle" type="button" onClick={() => setAssessmentActive(false)}>Close assessment</button>
+              </>
+            )}
+          </div>
           <div className="prompts">{['Beginner Python roadmap', 'BCA internship preparation', 'Explain Flask APIs'].map(q => <button key={q} onClick={() => setChatInput(q)}>{q}</button>)}</div>
           <form className="chat-form" onSubmit={sendMessage}><input aria-label="Message Fugu" placeholder="Ask Fugu anything..." value={chatInput} onChange={e => setChatInput(e.target.value)} /><button className="btn" type="submit" disabled={chatBusy || !chatInput.trim()}>Send ➤</button></form>
         </div>
@@ -908,9 +1197,168 @@ export default function App() {
           </div>
         </div>}
       </>;
+      case 'languages': return <>
+        <SectionHeading
+          eyebrow="Explore languages around the world"
+          title="Language Learning"
+          subtitle="Learn a new language step by step with Fugu AI. Practise vocabulary, conversations and quizzes."
+        />
+
+        <div className="panel form-fields">
+          <h3>Choose your learning path</h3>
+          <div className="two-fields">
+            <label>
+              Language you want to learn
+              <select
+                value={learningLanguage}
+                onChange={e => {
+                  setLearningLanguage(e.target.value);
+                  setLanguageLesson('');
+                  setLanguageFeedback('');
+                }}
+              >
+                <option>Japanese</option>
+                <option>Chinese (Mandarin)</option>
+                <option>Korean</option>
+                <option>French</option>
+                <option>Spanish</option>
+                <option>German</option>
+                <option>Arabic</option>
+                <option>Russian</option>
+                <option>Portuguese</option>
+                <option>Italian</option>
+                <option>Turkish</option>
+                <option>Thai</option>
+                <option>Indonesian</option>
+                <option>Vietnamese</option>
+                <option>Dutch</option>
+                <option>Swahili</option>
+                <option>Hindi</option>
+                <option>English</option>
+                <option>Bengali</option>
+                <option>Urdu</option>
+              </select>
+            </label>
+
+            <label>
+              Your learning level
+              <select
+                value={languageLevel}
+                onChange={e => setLanguageLevel(e.target.value)}
+              >
+                <option>Beginner</option>
+                <option>Elementary</option>
+                <option>Intermediate</option>
+                <option>Advanced</option>
+                <option>Expert</option>
+              </select>
+            </label>
+          </div>
+
+          <label>
+            What would you like to learn?
+            <input
+              value={languageTopic}
+              onChange={e => setLanguageTopic(e.target.value)}
+              placeholder="Daily conversation, travel, work, grammar..."
+            />
+          </label>
+
+          <p className="muted small">
+            Fugu explains in your selected AI response language. This does not change the language you are learning.
+          </p>
+
+          <div className="two-fields">
+            <button
+              className="btn"
+              disabled={languageBusy}
+              onClick={() => generateLanguagePractice('lesson')}
+            >
+              {languageBusy ? 'Fugu is preparing...' : 'Start lesson'}
+            </button>
+
+            <button
+              className="btn subtle"
+              disabled={languageBusy}
+              onClick={() => generateLanguagePractice('conversation')}
+            >
+              Conversation practice
+            </button>
+          </div>
+
+          <button
+            className="btn subtle wide"
+            disabled={languageBusy}
+            onClick={() => generateLanguagePractice('quiz')}
+          >
+            Practice quiz
+          </button>
+        </div>
+
+        {languageLesson && <div className="panel">
+          <h3>Your {learningLanguage} lesson</h3>
+          <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
+            {languageLesson}
+          </div>
+        </div>}
+
+        <div className="panel form-fields">
+          <h3>Practise and check your answer</h3>
+          <p className="muted small">
+            Write a sentence, translation or answer in {learningLanguage}. Fugu will check it and explain corrections.
+          </p>
+
+          <textarea
+            rows={4}
+            value={languageAnswer}
+            onChange={e => setLanguageAnswer(e.target.value)}
+            placeholder={`Write your ${learningLanguage} answer here...`}
+          />
+
+          <button
+            className="btn"
+            disabled={languageBusy || !languageAnswer.trim()}
+            onClick={checkLanguagePractice}
+          >
+            {languageBusy ? 'Checking...' : 'Check my answer'}
+          </button>
+
+          {languageFeedback && <div className="panel" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
+            {languageFeedback}
+          </div>}
+        </div>
+      </>;
+
       case 'profile': return <>
         <SectionHeading eyebrow="Personalize your experience" title="My Profile" subtitle="Your profile helps Fugu personalize its responses." />
         <div className="panel form-fields profile-form"><div className="two-fields">{[["Full name", 'full'], ["Education", 'edu'], ["Career goal", 'goal'], ["City", 'city']].map(([label, field]) => <label key={field}>{label}<input value={profile[field] || ''} onChange={e => setProfile(p => ({ ...p, [field]: e.target.value, ...(field === 'full' ? { name: e.target.value.trim().split(' ')[0] || '' } : {}) }))} /></label>)}</div>
+          <div className="two-fields">
+            <label>Age group
+              <select value={profile.ageGroup || 'College student'} onChange={e => setProfile(p => ({ ...p, ageGroup: e.target.value }))}>
+                <option>School student</option>
+                <option>College student</option>
+                <option>Adult learner</option>
+                <option>Working professional</option>
+                <option>Expert / Specialist</option>
+              </select>
+            </label>
+            <label>Class / Course / Job role
+              <input value={profile.classLevel || ''} placeholder="e.g. Class 8, BCA, MBA, Teacher" onChange={e => setProfile(p => ({ ...p, classLevel: e.target.value }))} />
+            </label>
+          </div>
+          <div className="two-fields">
+            <label>Assessment subject
+              <input value={profile.subject || 'General'} placeholder="e.g. Maths, Science, Python, Business" onChange={e => setProfile(p => ({ ...p, subject: e.target.value }))} />
+            </label>
+            <label>Learning level
+              <select value={profile.learningLevel || 'Intermediate'} onChange={e => setProfile(p => ({ ...p, learningLevel: e.target.value }))}>
+                <option>Beginner</option>
+                <option>Intermediate</option>
+                <option>Advanced</option>
+                <option>Expert</option>
+              </select>
+            </label>
+          </div>
           <label>Skills (comma separated)<input value={(profile.skills || []).join(', ')} onChange={e => setProfile(p => ({ ...p, skills: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))} /></label>
           <p className="muted small">Changes save automatically in this browser. When logged in, they also sync to your Flask /api/state.</p>
           {account && <button className="btn subtle" onClick={logout}>Log out</button>}
@@ -993,7 +1441,54 @@ export default function App() {
         <button className="btn" onClick={() => navigate('feedback')}>Give Feedback →</button>
       </section>
       <div className="landing-founder"><Founder /></div>
-    </> : page === 'login' ? <main className="auth-shell"><button className="back" onClick={() => navigate('home')}>← Back to Home</button><div className="auth-layout"><div className="auth-intro"><span className="eyebrow">AI Bharat Mentor</span><h1>Learn today.<br /><span className="gradient-text">Lead tomorrow.</span></h1><span className="fugu">🐡</span></div><form className="panel auth-form" onSubmit={authenticate}><h2>{authMode === 'signup' ? 'Create your account' : 'Welcome back'}</h2><p className="muted">Continue your journey toward your goals.</p>{authMode === 'signup' && <label>Full Name<input required minLength={2} autoComplete="name" value={authForm.name} onChange={e => setAuthForm(v => ({ ...v, name: e.target.value }))} /></label>}<label>Email<input type="email" required autoComplete="email" value={authForm.email} onChange={e => setAuthForm(v => ({ ...v, email: e.target.value }))} /></label><label>Password<input type="password" required minLength={6} autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'} value={authForm.password} onChange={e => setAuthForm(v => ({ ...v, password: e.target.value }))} /></label><button className="btn wide" disabled={authBusy}>{authBusy ? 'Please wait...' : authMode === 'signup' ? 'Sign up' : 'Log in'}</button><p className="muted small">{authMode === 'login' ? 'New here?' : 'Already registered?'} <button type="button" className="text-link" onClick={() => setAuthMode(m => m === 'login' ? 'signup' : 'login')}>{authMode === 'login' ? 'Create an account' : 'Log in instead'}</button></p></form></div></main> : <div className="workspace"><aside className="sidebar"><button className="brand" onClick={() => navigate('home')}><span className="brand-mark">✦</span><span>AI Bharat Mentor<small>LEARN · GROW · ACHIEVE</small></span></button><nav className="side-nav" aria-label="App sections">{MENU.map(([icon, key, label]) => <button key={key} className={page === key ? 'active' : ''} onClick={() => navigate(key)}><span className="nav-icon">{icon}</span>{label}</button>)}</nav><div className="sidebar-bottom"><span className="server-dot" />{serverStatus}</div></aside><main className="workspace-main"><header className="workspace-header"><div className="breadcrumb">AI Bharat Mentor <span> / {MENU.find(x => x[1] === page)?.[2] || 'Dashboard'}</span></div><div className="header-right"><select aria-label="AI language" value={language} onChange={e => setLanguage(e.target.value)}><option value="en">English</option><option value="hi">हिन्दी</option><option value="zh">中文</option></select><button className="avatar" onClick={() => navigate('profile')} title="Profile">{userName[0]?.toUpperCase() || 'P'}</button></div></header><div className="page-content">{content()}</div></main></div>}
+    </> : page === 'login' ? <main className="auth-shell"><button className="back" onClick={() => navigate('home')}>← Back to Home</button><div className="auth-layout"><div className="auth-intro"><span className="eyebrow">AI Bharat Mentor</span><h1>Learn today.<br /><span className="gradient-text">Lead tomorrow.</span></h1><span className="fugu">🐡</span></div><form className="panel auth-form" onSubmit={authenticate}><h2>{authMode === 'signup' ? 'Create your account' : 'Welcome back'}</h2><p className="muted">Continue your journey toward your goals.</p>{authMode === 'signup' && <label>Full Name<input required minLength={2} autoComplete="name" value={authForm.name} onChange={e => setAuthForm(v => ({ ...v, name: e.target.value }))} /></label>}{authMode === 'signup' && <>
+<label>Education<input required value={authForm.edu} onChange={e => setAuthForm(v => ({ ...v, edu: e.target.value }))} placeholder="e.g. BCA 2nd Year" /></label>
+<label>City<input required value={authForm.city} onChange={e => setAuthForm(v => ({ ...v, city: e.target.value }))} placeholder="Your city" /></label>
+<label>Career Goal<input required value={authForm.goal} onChange={e => setAuthForm(v => ({ ...v, goal: e.target.value }))} placeholder="e.g. Data Analyst" /></label>
+<label>Skills (comma separated)<input required value={authForm.skills} onChange={e => setAuthForm(v => ({ ...v, skills: e.target.value }))} placeholder="e.g. Python, SQL, Excel" /></label>
+</>}<label>Email<input type="email" required autoComplete="email" value={authForm.email} onChange={e => setAuthForm(v => ({ ...v, email: e.target.value }))} /></label><label>Password<input type="password" required minLength={6} autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'} value={authForm.password} onChange={e => setAuthForm(v => ({ ...v, password: e.target.value }))} /></label><button className="btn wide" disabled={authBusy}>{authBusy ? 'Please wait...' : authMode === 'signup' ? 'Sign up' : 'Log in'}</button><p className="muted small">{authMode === 'login' ? 'New here?' : 'Already registered?'} <button type="button" className="text-link" onClick={() => setAuthMode(m => m === 'login' ? 'signup' : 'login')}>{authMode === 'login' ? 'Create an account' : 'Log in instead'}</button></p></form></div></main> : <div className="workspace"><aside className="sidebar"><button className="brand" onClick={() => navigate('home')}><span className="brand-mark">✦</span><span>AI Bharat Mentor<small>LEARN · GROW · ACHIEVE</small></span></button><nav className="side-nav" aria-label="App sections">{MENU.map(([icon, key, label]) => <button key={key} className={page === key ? 'active' : ''} onClick={() => navigate(key)}><span className="nav-icon">{icon}</span>{t(label)}</button>)}</nav><div className="sidebar-bottom"><span className="server-dot" />{serverStatus}</div></aside><main className="workspace-main"><header className="workspace-header"><div className="breadcrumb">AI Bharat Mentor <span> / {MENU.find(x => x[1] === page)?.[2] || 'Dashboard'}</span></div><div className="header-right"><select aria-label="AI language" value={language} onChange={e => setLanguage(e.target.value)}>
+  <option value="en">English</option>
+  <option value="zh">中文</option>
+  <option value="as">অসমীয়া</option>
+  <option value="bn">বাংলা</option>
+  <option value="brx">बड़ो</option>
+  <option value="doi">डोगरी</option>
+  <option value="gu">ગુજરાતી</option>
+  <option value="hi">हिन्दी</option>
+  <option value="hinglish">Hinglish (हिंग्लिश)</option>
+  <option value="kn">ಕನ್ನಡ</option>
+  <option value="ks">कॉशुर / کٲشُر</option>
+  <option value="kok">कोंकणी</option>
+  <option value="mai">मैथिली</option>
+  <option value="ml">മലയാളം</option>
+  <option value="mni">মেইতেইলোন</option>
+  <option value="mr">मराठी</option>
+  <option value="ne">नेपाली</option>
+  <option value="or">ଓଡ଼ିଆ</option>
+  <option value="pa">ਪੰਜਾਬੀ</option>
+  <option value="sa">संस्कृतम्</option>
+  <option value="sat">ᱥᱟᱱᱛᱟᱲᱤ</option>
+  <option value="sd">سنڌي</option>
+  <option value="ta">தமிழ்</option>
+  <option value="te">తెలుగు</option>
+  <option value="ur">اردو</option>
+  <option value="es">Español</option>
+  <option value="fr">Français</option>
+  <option value="de">Deutsch</option>
+  <option value="ja">日本語</option>
+  <option value="ko">한국어</option>
+  <option value="ar">العربية</option>
+  <option value="pt">Português</option>
+  <option value="ru">Русский</option>
+  <option value="it">Italiano</option>
+  <option value="id">Bahasa Indonesia</option>
+  <option value="tr">Türkçe</option>
+  <option value="th">ไทย</option>
+  <option value="vi">Tiếng Việt</option>
+  <option value="nl">Nederlands</option>
+  <option value="sw">Kiswahili</option>
+  <option value="fa">فارسی</option>
+</select><button className="avatar" onClick={() => navigate('profile')} title="Profile">{userName[0]?.toUpperCase() || 'P'}</button></div></header><div className="page-content">{content()}</div></main></div>}
     {alert && <div role="alert" className="toast"><span>{alert}</span><button aria-label="Dismiss notification" onClick={() => setAlert('')}>×</button></div>}
   </div>;
 }
